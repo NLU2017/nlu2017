@@ -11,6 +11,7 @@ class SentenceCleaner:
     END_SEQ = "<eos>"
     SPLIT = " "
 
+
     def prepare_sentence(self, input_string):
         """
         takes any input sentencse (string of words separated by \" \" (SPACE) and resturns a
@@ -33,8 +34,17 @@ class SentenceCleaner:
 
 
 class DataLoader:
+    """
+    loads the trainings data and creates a generator for data batches to serve to Neural Networks
+    """
+
+    UNKNOWN = "<unk>"
+
+
     #can have this one as a class attribute since it is stateless
     cleaner = SentenceCleaner()
+
+
 
     def __init__(self, path, do_shuffle = True):
         print("Reading data from {} ".format(path))
@@ -54,6 +64,13 @@ class DataLoader:
             for line in file:
                 list.append(DataLoader.cleaner.prepare_sentence(line))
         self.data = np.array(list)
+        vocabulary = Vocabulary()
+        vocabulary.extract(self.data)
+        dim = self.data.shape
+        for x in dim[0]:
+            for y in dim[1]:
+                if not vocabulary.contains(self.data[x,y]):
+                    self.data[x][y] == DataLoader.UNKNOWN
 
 
     def batch_iterator(self, num_epochs, batch_size):
@@ -82,3 +99,15 @@ class DataLoader:
 
 
 
+class Vocabulary:
+    SIZE = 20000
+
+
+    def extract(self, data):
+        unic, cts = np.unique(data, return_counts=True)
+        unic = unic[np.argsort(-cts)]
+        max_words = min(unic.shape[0], Vocabulary.SIZE)
+        self.words = unic[0:max_words]
+
+    def contains(self, word):
+        return word in self.words

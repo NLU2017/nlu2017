@@ -3,6 +3,8 @@ sys.path.append('../src')
 import unittest
 from utils import SentenceCleaner
 from utils import DataLoader
+from utils import Vocabulary
+import numpy as np
 
 class SentenceCleanerTest(unittest.TestCase):
 
@@ -61,4 +63,19 @@ class DataLoaderTest(unittest.TestCase):
 
 
 
+class VocabularyTest(unittest.TestCase):
+
+     def setUp(self):
+          self.voc = Vocabulary()
+          Vocabulary.SIZE = 3
+
+     def test_vocabulary(self):
+          data = [["eins", "zwei", "drei"], ["zwei", "zwei", "drei"], ["drei", "drei", "eins"], ["vier", "zwei", "eins"]]
+          self.voc.extract(data)
+          assert self.voc.words.shape[0] == 3
+          assert self.voc.contains("zwei")
+          assert self.voc.contains("drei")
+          assert self.voc.contains("eins")
+
+          assert not self.voc.contains("vier")
 
