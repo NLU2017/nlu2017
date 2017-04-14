@@ -37,6 +37,7 @@ class DataLoader:
     cleaner = SentenceCleaner()
 
     def __init__(self, path, do_shuffle = True):
+        print("Reading data from {} ".format(path))
         self.load_data(path)
         self.shuffle = do_shuffle
 
