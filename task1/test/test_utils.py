@@ -43,9 +43,22 @@ class DataLoaderTest(unittest.TestCase):
           unittest.main()
 
      def setUp(self):
-          self.loader = DataLoader()
+          self.loader = DataLoader("./testfile.txt", do_shuffle=False)
 
      def test_loadFileIntoMemory(self):
-          self.loader.load_data("./testfile.txt")
+          #loading data is done in constructor
           assert self.loader.data is not None
-          assert self.loader.data.shape == (5, 30)
+          assert self.loader.data.shape == (6, 30)
+
+     def test_iterate_over_all_epochs_and_batches(self):
+          batches = self.loader.batch_iterator(3, 3)
+          count = 0
+
+          for i in batches:
+               count +=1
+               assert i.shape == (3,30)
+          assert count == 6
+
+
+
+
