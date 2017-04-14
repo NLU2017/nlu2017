@@ -7,24 +7,15 @@ class SentenceCleaner:
     END_SEQ = "<eos>"
     SPLIT = " "
 
-    def prepare(self, input_string):
-        output = np.ndarray([1, 30], dtype='object')
-        output[0] = self.INIT_SEQ
+    def prepare_sentence(self, input_string):
+        line_array = np.ndarray([30], dtype='object')
+        line_array[0] = self.INIT_SEQ
         word_list = input_string.split(self.SPLIT)
-        end = np.min(len(word_list, self.LENGTH))
-        output[1:end] = word_list[0:end]
-        output[-1] = self.END_SEQ
-        word_list.insert(0, self.INIT_SEQ)
+        end = min(len(word_list), self.LENGTH-1)
+        line_array[1:end + 1] = word_list[0:end]
+        line_array[-1] = self.END_SEQ
 
-        return word_list
-
+        return line_array
 
 
-def load_data(path):
-    with open(path) as file:
-        for line in file:
-            res = prepare_sentence(line)
 
-
-def prepare_sentence(line):
-    return line
