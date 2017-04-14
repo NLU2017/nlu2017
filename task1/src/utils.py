@@ -50,7 +50,7 @@ class DataLoader:
         list = []
         with open(path) as file:
             for line in file:
-                list.append(self.cleaner(line))
+                list.append(self.cleaner.prepare_sentence(line))
         self.data = np.array(list)
 
 

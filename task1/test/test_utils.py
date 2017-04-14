@@ -2,12 +2,16 @@ import sys
 sys.path.append('../src')
 import unittest
 from utils import SentenceCleaner
+from utils import DataLoader
 
 class SentenceCleanerTest(unittest.TestCase):
-     cleaner = SentenceCleaner()
+
 
      if __name__ == '__main__':
           unittest.main()
+
+     def setUp(self):
+          self.cleaner = SentenceCleaner()
 
      def test_SentenceCleaner_array_starts_with_bos(self):
           sentence = "lorem ipsum dolor sit amet , consetetur"
@@ -32,3 +36,16 @@ class SentenceCleanerTest(unittest.TestCase):
                assert ar[i] == self.cleaner.PADDING
 
 
+
+
+class DataLoaderTest(unittest.TestCase):
+     if __name__ == '__main__':
+          unittest.main()
+
+     def setUp(self):
+          self.loader = DataLoader()
+
+     def test_loadFileIntoMemory(self):
+          self.loader.load_data("./testfile.txt")
+          assert self.loader.data is not None
+          assert self.loader.data.shape == (5, 30)
