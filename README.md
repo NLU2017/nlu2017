@@ -6,9 +6,9 @@ Project repository for the lecture Natural Language Understanding at ETH 2017.
 
 ### Structure
  - task1:  contains all code relevant for the first task.
-    -- data: data files, these files are not checked into the repository, download to your machine directly from polybox..
-     -- src: all (productive) python src codes
-    -- test: unit tests
+    - data: data files, these files are not checked into the repository, download to your machine directly from polybox..
+    - src: all (productive) python src codes
+    - test: unit tests
 
 ##Technical requirements
 the code uses the following libraries:
