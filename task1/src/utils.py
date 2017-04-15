@@ -62,6 +62,8 @@ class DataLoader:
             self.replace_unknown(vocabulary)
 
 
+    #TODO this is not very performant but I did not come up with a better way than looping
+    #
     def replace_unknown(self, vocabulary):
         dim = self.data.shape
         for x in range(0,dim[0]):
