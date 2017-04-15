@@ -2,6 +2,7 @@ import time
 import os
 import tensorflow as tf
 from utils import DataLoader
+from utils import Vocabulary
 
 
 ## PARAMETERS ##
@@ -35,9 +36,15 @@ timestamp = str(int(time.time()))
 FLAGS.model_dir = os.path.abspath(os.path.join(FLAGS.log_dir, timestamp))
 print("Writing to {}\n".format(FLAGS.model_dir))
 
+
+
 def main(unused_argv):
+    # extract the vocabulary from training sentendes
+    vocabulary = Vocabulary()
+    vocabulary.load_file(FLAGS.train_file_path)
+
     #load training data
-    train_loader = DataLoader(FLAGS.train_file_path, do_shuffle=True)
+    train_loader = DataLoader(FLAGS.train_file_path, vocabulary, do_shuffle=True)
     batches_train = train_loader.batch_iterator(FLAGS.num_epochs, FLAGS.batch_size)
 
     #loop over training batches
