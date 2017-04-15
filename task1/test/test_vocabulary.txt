@@ -1,0 +1,4 @@
+eins zwei drei sieben
+zwei zwei drei sechs
+drei drei eins eins
+vier zwei eins

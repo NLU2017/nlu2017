@@ -1,4 +1,5 @@
 import numpy as np
+import collections
 
 class SentenceCleaner:
     """ handles a single string a 'sentence' and converts it to a 1 d tensor doing all necessary preparations to it
@@ -6,10 +7,6 @@ class SentenceCleaner:
     """
 
     LENGTH = 30
-    PADDING = "<pad>"
-    INIT_SEQ = "<bos>"
-    END_SEQ = "<eos>"
-    SPLIT = " "
 
 
     def prepare_sentence(self, input_string):
@@ -22,12 +19,12 @@ class SentenceCleaner:
             - contains up to 28 words from the input sentence in between
             - if the sentence is shorter the array is padded with <pad>
         """
-        words = input_string.strip().split(SentenceCleaner.SPLIT)
-        t = [words[i] if i < len(words) else SentenceCleaner.PADDING for i in range(30)]
+        words = input_string.strip().split(Vocabulary.SPLIT)
+        t = [words[i] if i < len(words) else Vocabulary.PADDING for i in range(30)]
         line_array = np.ndarray([30], dtype='object')
-        line_array[0] = SentenceCleaner.INIT_SEQ
+        line_array[0] = Vocabulary.INIT_SEQ
         line_array[1:SentenceCleaner.LENGTH] = t[0:SentenceCleaner.LENGTH-1]
-        line_array[-1] = SentenceCleaner.END_SEQ
+        line_array[-1] = Vocabulary.END_SEQ
         return line_array
 
 
@@ -37,22 +34,19 @@ class DataLoader:
     """
     loads the trainings data and creates a generator for data batches to serve to Neural Networks
     """
-
-    UNKNOWN = "<unk>"
-
-
     #can have this one as a class attribute since it is stateless
     cleaner = SentenceCleaner()
 
 
 
-    def __init__(self, path, do_shuffle = True):
+    def __init__(self, path, vocabulary=None, do_shuffle = True):
         print("Reading data from {} ".format(path))
-        self.load_data(path)
+        self.load_data(path, vocabulary)
         self.shuffle = do_shuffle
 
 
-    def load_data(self, path):
+
+    def load_data(self, path, vocabulary):
         """ takes the path to the data file and loads the data into memory
             data is loaded into a tensor [samples, 30]
             TODO: at the moment this loads the entire file into memory, because it is then easier to
@@ -64,13 +58,17 @@ class DataLoader:
             for line in file:
                 list.append(DataLoader.cleaner.prepare_sentence(line))
         self.data = np.array(list)
-        vocabulary = Vocabulary()
-        vocabulary.extract(self.data)
+        if vocabulary is not None:
+            self.replace_unknown(vocabulary)
+
+
+    def replace_unknown(self, vocabulary):
         dim = self.data.shape
-        for x in dim[0]:
-            for y in dim[1]:
-                if not vocabulary.contains(self.data[x,y]):
-                    self.data[x][y] == DataLoader.UNKNOWN
+        for x in range(0,dim[0]):
+            for y in range(0, dim[1]):
+                if not vocabulary.contains(self.data[x, y]):
+                    self.data[x][y] == Vocabulary.UNK
+
 
 
     def batch_iterator(self, num_epochs, batch_size):
@@ -97,17 +95,41 @@ class DataLoader:
 
 
 
-
-
 class Vocabulary:
     SIZE = 20000
 
+    PADDING = "<pad>"
+    INIT_SEQ = "<bos>"
+    END_SEQ = "<eos>"
+    UNK = "<unk>"
+    SPLIT = " "
+    keywords = [PADDING, END_SEQ, INIT_SEQ, UNK]
 
     def extract(self, data):
-        unic, cts = np.unique(data, return_counts=True)
+        list = np.array(data)
+        unic, cts = np.unique(np.array(list), return_counts=True)
         unic = unic[np.argsort(-cts)]
-        max_words = min(unic.shape[0], Vocabulary.SIZE)
+        print(unic)
+        max_words = min(Vocabulary.SIZE - len(Vocabulary.keywords), unic.shape[0])
         self.words = unic[0:max_words]
 
+    def load_file(self, path):
+        wordcount = collections.Counter()
+        with open(path) as file:
+            for line in file:
+                wordcount.update(line.split())
+        self.extract(sorted(wordcount, key = wordcount.get))
+
+    def extract(self, data):
+        list = np.array(data)
+        unic, cts = np.unique(np.array(list), return_counts=True)
+        unic = unic[np.argsort(-cts)]
+        max_words = min(Vocabulary.SIZE - len(Vocabulary.keywords), unic.shape[0])
+        self.words = unic[0:max_words]
+
+
     def contains(self, word):
-        return word in self.words
+        """returns True if the word is one of the keywords
+        or in the extracted vocabulary"""
+        return word in self.words or word in Vocabulary.keywords
+
