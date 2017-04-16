@@ -116,13 +116,6 @@ class Vocabulary:
         self.words = sorted(wordcount, key=wordcount.get, reverse=True)[0:max_words]
 
 
-    def extract(self, data):
-        list = np.array(data)
-        unic, cts = np.unique(np.array(list), return_counts=True)
-        unic = unic[np.argsort(-cts)]
-        max_words = min(Vocabulary.SIZE - len(Vocabulary.keywords), unic.shape[0])
-        self.words = unic[0:max_words]
-
 
     def contains(self, word):
         """returns True if the word is one of the keywords
