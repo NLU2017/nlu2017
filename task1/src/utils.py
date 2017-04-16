@@ -107,20 +107,14 @@ class Vocabulary:
     SPLIT = " "
     keywords = [PADDING, END_SEQ, INIT_SEQ, UNK]
 
-    def extract(self, data):
-        list = np.array(data)
-        unic, cts = np.unique(np.array(list), return_counts=True)
-        unic = unic[np.argsort(-cts)]
-        print(unic)
-        max_words = min(Vocabulary.SIZE - len(Vocabulary.keywords), unic.shape[0])
-        self.words = unic[0:max_words]
-
     def load_file(self, path):
         wordcount = collections.Counter()
         with open(path) as file:
             for line in file:
                 wordcount.update(line.split())
-        self.extract(sorted(wordcount, key = wordcount.get))
+        max_words = min(Vocabulary.SIZE - len(Vocabulary.keywords), len(wordcount))
+        self.words = sorted(wordcount, key=wordcount.get, reverse=True)[0:max_words]
+
 
     def extract(self, data):
         list = np.array(data)
