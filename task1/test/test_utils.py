@@ -78,3 +78,14 @@ class VocabularyTest(unittest.TestCase):
         assert not self.voc.contains("vier")
         assert not self.voc.contains("sieben")
         assert not self.voc.contains("sechs")
+
+
+    def test_get_vocabulary_as_dict(self):
+        self.voc.load_file("./test_vocabulary.txt")
+        dict = self.voc.get_vocabulary_as_dict()
+
+        for k, val in enumerate(Vocabulary.keywords):
+            assert dict[val] == 3 + k
+        assert dict["drei"] == 0
+        assert dict["zwei"] == 1
+        assert dict["eins"] == 2

@@ -124,11 +124,13 @@ class Vocabulary:
                 wordcount.update(line.split())
         max_words = min(Vocabulary.SIZE - len(Vocabulary.keywords), len(wordcount))
         self.words = sorted(wordcount, key=wordcount.get, reverse=True)[0:max_words]
+        self.words.extend(Vocabulary.keywords)
 
-
+    def get_vocabulary_as_dict(self):
+        return {k:v for v, k in enumerate(self.words)}
 
     def contains(self, word):
         """returns True if the word is one of the keywords
         or in the extracted vocabulary"""
-        return word in self.words or word in Vocabulary.keywords
+        return word in self.words
 

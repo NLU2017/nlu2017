@@ -1,4 +1,4 @@
 eins zwei drei sieben
 zwei zwei drei sechs
-drei drei eins eins
+drei drei eins eins zwei drei drei
 vier zwei eins
