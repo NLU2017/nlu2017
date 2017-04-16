@@ -20,8 +20,8 @@ class SentenceCleaner:
             - if the sentence is shorter the array is padded with <pad>
         """
         words = input_string.strip().split(Vocabulary.SPLIT)
-        t = [words[i] if i < len(words) else Vocabulary.PADDING for i in range(30)]
-        line_array = np.ndarray([30], dtype='object')
+        t = [words[i] if i < len(words) else Vocabulary.PADDING for i in range(SentenceCleaner.LENGTH)]
+        line_array = np.ndarray([SentenceCleaner.LENGTH], dtype='object')
         line_array[0] = Vocabulary.INIT_SEQ
         line_array[1:SentenceCleaner.LENGTH] = t[0:SentenceCleaner.LENGTH-1]
         line_array[-1] = Vocabulary.END_SEQ
