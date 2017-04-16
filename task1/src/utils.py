@@ -1,5 +1,6 @@
 import numpy as np
 import collections
+import pickle
 
 class SentenceCleaner:
     """ handles a single string a 'sentence' and converts it to a 1 d tensor doing all necessary preparations to it
@@ -11,7 +12,7 @@ class SentenceCleaner:
 
     def prepare_sentence(self, input_string):
         """
-        takes any input sentencse (string of words separated by \" \" (SPACE) and resturns a
+        takes any input sentence (string of words separated by \" \" (SPACE) and resturns a
         numpy array which
             - has length 30
             - starts with <bos> and
@@ -39,14 +40,20 @@ class DataLoader:
 
 
 
-    def __init__(self, path, vocabulary=None, do_shuffle = True):
+    def __init__(self, path, store_path, vocabulary=None, do_shuffle = True):
         print("Reading data from {} ".format(path))
-        self.load_data(path, vocabulary)
+        try:
+            self.data = pickle.load(
+                open(store_path + "data_clean.pkl", "rb"))
+            print("Using pre-cleaned data")
+        except NameError:
+            print("Using row data")
+            self.load_data(path, vocabulary, store_path)
         self.shuffle = do_shuffle
 
 
 
-    def load_data(self, path, vocabulary):
+    def load_data(self, path, vocabulary, store_path):
         """ takes the path to the data file and loads the data into memory
             data is loaded into a tensor [samples, 30]
             TODO: at the moment this loads the entire file into memory, because it is then easier to
@@ -60,6 +67,8 @@ class DataLoader:
         self.data = np.array(list)
         if vocabulary is not None:
             self.replace_unknown(vocabulary)
+        pickle.dump(train_loader,
+                    open(store_path + "data_clean.pkl", "wb"))
 
 
     #TODO this is not very performant but I did not come up with a better way than looping
@@ -70,6 +79,7 @@ class DataLoader:
             for y in range(0, dim[1]):
                 if not vocabulary.contains(self.data[x, y]):
                     self.data[x][y] == Vocabulary.UNK
+
 
 
 
