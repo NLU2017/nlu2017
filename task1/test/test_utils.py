@@ -64,12 +64,9 @@ class VocabularyTest(unittest.TestCase):
         self.voc = Vocabulary()
         Vocabulary.SIZE = 7
 
-    def test_vocabulary(self):
-        # data = [["eins", "zwei", "drei", "sieben"],["zwei", "zwei", "drei", "sechs"], ["drei", "drei", "eins", "eins"],["vier", "zwei", "eins"]]
-        data = ["eins", "zwei", "drei", "sieben", "zwei", "zwei", "drei", "sechs", "drei", "drei", "eins", "eins",
-                "vier", "zwei", "eins"]
-        self.voc.extract(data)
 
+    def test_load_file(self):
+        self.voc.load_file("./test_vocabulary.txt")
         assert self.voc.contains("zwei")
         assert self.voc.contains("drei")
         assert self.voc.contains("eins")
@@ -83,16 +80,12 @@ class VocabularyTest(unittest.TestCase):
         assert not self.voc.contains("sechs")
 
 
-def test_load_file(self):
-    self.voc.load_file("./test_vocabulary.txt")
-    assert self.voc.contains("zwei")
-    assert self.voc.contains("drei")
-    assert self.voc.contains("eins")
-    assert self.voc.contains(Vocabulary.UNK)
-    assert self.voc.contains(Vocabulary.END_SEQ)
-    assert self.voc.contains(Vocabulary.INIT_SEQ)
-    assert self.voc.contains(Vocabulary.PADDING)
+    def test_get_vocabulary_as_dict(self):
+        self.voc.load_file("./test_vocabulary.txt")
+        dict = self.voc.get_vocabulary_as_dict()
 
-    assert not self.voc.contains("vier")
-    assert not self.voc.contains("sieben")
-    assert not self.voc.contains("sechs")
+        for k, val in enumerate(Vocabulary.keywords):
+            assert dict[val] == 3 + k
+        assert dict["drei"] == 0
+        assert dict["zwei"] == 1
+        assert dict["eins"] == 2
