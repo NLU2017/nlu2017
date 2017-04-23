@@ -121,8 +121,6 @@ def main(unused_argv):
             gc_, _, pp_ = sess.run([global_counter, train_op, perplexity],
                                    feed_dict={input_words: data_train})
             if gc_ % 100 == 0 and gc_ > 1:
-                print(type(gc_))
-                print(type(pp_))
                 print("Current perplexity: %s" % pp_)
 
 
