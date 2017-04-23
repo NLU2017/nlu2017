@@ -23,7 +23,7 @@ tf.flags.DEFINE_integer("embedding_size", 100, "Dimension of the embedding")
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
-tf.flags.DEFINE_integer("num_epochs", 1,
+tf.flags.DEFINE_integer("num_epochs", 2,
                         "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("evaluate_every", 100,
                         "Evaluate model on dev set after this many steps (default: 100)")
@@ -67,23 +67,25 @@ def main(unused_argv):
 
     # Create the graph
     global_counter = tf.Variable(0, trainable=False)
+    # For now the embedding is a matrix to be learned from scratch
     embedding_matrix = tf.get_variable(
         name="embedding_matrix",
         shape=[FLAGS.vocab_size, FLAGS.embedding_size],
         dtype=tf.float32,
         initializer=tf.contrib.layers.xavier_initializer())
+
     input_words = tf.placeholder(tf.int32, [FLAGS.batch_size, FLAGS.sentence_length])
     embedded_words = tf.nn.embedding_lookup(embedding_matrix, input_words)
-
     lstm = tf.contrib.rnn.BasicLSTMCell(FLAGS.lstm_size)
+    # Somehow lstm has a touple of states instead of just one.
     lstm_state = lstm.zero_state(FLAGS.batch_size, tf.float32)
 
-    out_to_logit_w = tf.random_uniform(
-        [FLAGS.lstm_size,
-         FLAGS.vocab_size],
-        -1.0/tf.sqrt(tf.to_float(FLAGS.lstm_size)),
-        1.0/tf.sqrt(tf.to_float(FLAGS.lstm_size)))
-    out_to_logit_b = tf.zeros([FLAGS.vocab_size])
+    out_to_logit_w = tf.get_variable(
+        name="output_weights",
+        shape=[FLAGS.lstm_size, FLAGS.vocab_size],
+        dtype=tf.float32,
+        initializer=tf.contrib.layers.xavier_initializer())
+    out_to_logit_b = tf.Variable(tf.zeros([FLAGS.vocab_size]))
 
     probabilities = []
     loss = 0.0
@@ -92,14 +94,15 @@ def main(unused_argv):
         for time_step in range(FLAGS.sentence_length):
             if time_step > 0:
                 tf.get_variable_scope().reuse_variables()
-            lstm_out, lstm_state = lstm(embedded_words[:, time_step, :], lstm_state)
+            lstm_out, lstm_state = lstm(embedded_words[:, time_step, :],
+                                        lstm_state)
             logits = tf.matmul(lstm_out, out_to_logit_w) + out_to_logit_b
             probabilities.append(tf.nn.softmax(logits))
             loss += tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=input_words[:, time_step],
                 logits=logits)
 
-    perplexity = tf.reduce_mean(loss) / FLAGS.sentence_length
+    perplexity = tf.exp(tf.reduce_mean(loss) / FLAGS.sentence_length)
 
     optimiser = tf.train.AdamOptimizer(FLAGS.learning_rate)
     gradients, v = zip(*optimiser.compute_gradients(loss))
@@ -113,12 +116,14 @@ def main(unused_argv):
 
     # loop over training batches
     with tf.Session() as sess:
-        sess.run(init_op) # TODO add saver and restore if needed
+        sess.run(init_op)  # TODO add saver and restore if needed
         for data_train in batches_train:
             gc_, _, pp_ = sess.run([global_counter, train_op, perplexity],
                                    feed_dict={input_words: data_train})
-            if gc_ % 100 == 0 and gc_ >1:
-                print("Current perplexity: %d" % pp_)
+            if gc_ % 100 == 0 and gc_ > 1:
+                print(type(gc_))
+                print(type(pp_))
+                print("Current perplexity: %s" % pp_)
 
 
 if __name__ == '__main__':
