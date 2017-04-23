@@ -33,6 +33,7 @@ tf.flags.DEFINE_boolean("allow_soft_placement", True,
 tf.flags.DEFINE_boolean("log_device_placement", False,
                         "Log placement of ops on devices")
 
+
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
 print("\nCommand-line Arguments:")
