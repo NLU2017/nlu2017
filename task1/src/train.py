@@ -23,7 +23,7 @@ tf.flags.DEFINE_integer("embedding_size", 100, "Dimension of the embedding")
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
-tf.flags.DEFINE_integer("num_epochs", 200,
+tf.flags.DEFINE_integer("num_epochs", 1,
                         "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("evaluate_every", 100,
                         "Evaluate model on dev set after this many steps (default: 100)")
@@ -66,15 +66,17 @@ def main(unused_argv):
                                                 FLAGS.batch_size)
 
     # Create the graph
-    embedding_matrix = tf.random_uniform([FLAGS.vocab_size,
-                                          FLAGS.embedding_size],
-                                         -1.0 / tf.sqrt(tf.to_float(FLAGS.vocab_size)),
-                                         1.0 / tf.sqrt(tf.to_float(FLAGS.vocab_size)))
+    global_counter = tf.Variable(0, trainable=False)
+    embedding_matrix = tf.get_variable(
+        name="embedding_matrix",
+        shape=[FLAGS.vocab_size, FLAGS.embedding_size],
+        dtype=tf.float32,
+        initializer=tf.contrib.layers.xavier_initializer())
     input_words = tf.placeholder(tf.int32, [FLAGS.batch_size, FLAGS.sentence_length])
     embedded_words = tf.nn.embedding_lookup(embedding_matrix, input_words)
 
-    lstm_state = tf.zeros([FLAGS.batch_size, FLAGS.lstm_size])
     lstm = tf.contrib.rnn.BasicLSTMCell(FLAGS.lstm_size)
+    lstm_state = lstm.zero_state(FLAGS.batch_size, tf.float32)
 
     out_to_logit_w = tf.random_uniform(
         [FLAGS.lstm_size,
@@ -88,27 +90,35 @@ def main(unused_argv):
 
     with tf.variable_scope("RNN"):
         for time_step in range(FLAGS.sentence_length):
-            if time_step > 0: tf.get_variable_scope().reuse_variables()
-            a = embedded_words[:, time_step, :]
-            b = lstm_state
-            lstm(a, b)
-            # TODO the next line does not run. I fail to see why.
+            if time_step > 0:
+                tf.get_variable_scope().reuse_variables()
             lstm_out, lstm_state = lstm(embedded_words[:, time_step, :], lstm_state)
             logits = tf.matmul(lstm_out, out_to_logit_w) + out_to_logit_b
             probabilities.append(tf.nn.softmax(logits))
             loss += tf.nn.sparse_softmax_cross_entropy_with_logits(
-                logits, input_words[:, time_step])
+                labels=input_words[:, time_step],
+                logits=logits)
+
+    perplexity = tf.reduce_mean(loss) / FLAGS.sentence_length
 
     optimiser = tf.train.AdamOptimizer(FLAGS.learning_rate)
-    train_vars = tf.trainable_variables()
+    gradients, v = zip(*optimiser.compute_gradients(loss))
     # TODO from the doc it looks as if we actually wanted to set use_norm to 10 instead. Confirm!
     # https://www.tensorflow.org/api_docs/python/tf/clip_by_global_norm
-    clipped_gradients = tf.clip_by_global_norm(tf.gradients(loss, train_vars), 10)
-    train_op = optimiser.apply_gradients(zip(clipped_gradients, train_vars))
+    clipped_gradients, _ = tf.clip_by_global_norm(gradients, 10)
+    train_op = optimiser.apply_gradients(zip(clipped_gradients, v),
+                                         global_step=global_counter)
+
+    init_op = tf.global_variables_initializer()
 
     # loop over training batches
-    for data_train in batches_train:
-        pass
+    with tf.Session() as sess:
+        sess.run(init_op) # TODO add saver and restore if needed
+        for data_train in batches_train:
+            gc_, _, pp_ = sess.run([global_counter, train_op, perplexity],
+                                   feed_dict={input_words: data_train})
+            if gc_ % 100 == 0 and gc_ >1:
+                print("Current perplexity: %d" % pp_)
 
 
 if __name__ == '__main__':

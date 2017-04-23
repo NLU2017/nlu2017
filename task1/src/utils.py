@@ -42,13 +42,7 @@ class DataLoader:
 
     def __init__(self, path, store_path, vocabulary=None, do_shuffle = True):
         print("Reading data from {} ".format(path))
-        try:
-            self.data = pickle.load(
-                open(store_path + "data_clean.pkl", "rb"))
-            print("Using pre-cleaned data")
-        except NameError:
-            print("Using row data")
-            self.load_data(path, vocabulary, store_path)
+        self.load_data(path, vocabulary, store_path)
         self.shuffle = do_shuffle
 
 
@@ -65,23 +59,13 @@ class DataLoader:
             for line in file:
                 list.append(DataLoader.cleaner.prepare_sentence(line))
         self.data = np.array(list)
+        print("Start translation")
         if vocabulary is not None:
-            self.replace_unknown(vocabulary)
-        pickle.dump(train_loader,
-                    open(store_path + "data_clean.pkl", "wb"))
+            voc = vocabulary.get_vocabulary_as_dict()
+            self.data_num = np.array([voc.get(w, voc["<unk>"]) for w in self.data.reshape([-1])]).reshape(self.data.shape)
 
-
-    #TODO this is not very performant but I did not come up with a better way than looping
-    #
-    def replace_unknown(self, vocabulary):
-        dim = self.data.shape
-        for x in range(0,dim[0]):
-            for y in range(0, dim[1]):
-                if not vocabulary.contains(self.data[x, y]):
-                    self.data[x][y] == Vocabulary.UNK
-
-
-
+        pickle.dump(self, open(store_path + "data_clean.pkl", "wb"))
+        # TODO decide whether we still need self.data hereafter. If not, drop.
 
     def batch_iterator(self, num_epochs, batch_size):
         """
@@ -90,16 +74,16 @@ class DataLoader:
         :param batch_size: nr of samples in one data batch
         :return: batch of size batch_size
         """
-        num_samples = self.data.shape[0]
+        num_samples = self.data_num.shape[0]
         batches_per_epoch = int((num_samples - 1) / batch_size) + 1
         for epoch in range(num_epochs):
 
             # Shuffle the data at each epoch
             if self.shuffle:
                 shuffle_indices = np.random.permutation(np.arange(num_samples))
-                shuffled_data = self.data[shuffle_indices]
+                shuffled_data = self.data_num[shuffle_indices]
             else:
-                shuffled_data = self.data
+                shuffled_data = self.data_num
             for b in range(batches_per_epoch):
                 start_index = b * batch_size
                 end_index = min((b + 1) * batch_size, num_samples)
