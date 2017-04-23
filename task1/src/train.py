@@ -4,6 +4,7 @@ import tensorflow as tf
 from utils import DataLoader
 from utils import Vocabulary
 
+
 ## PARAMETERS ##
 
 # Data loading parameters
