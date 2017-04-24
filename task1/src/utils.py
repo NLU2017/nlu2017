@@ -40,14 +40,14 @@ class DataLoader:
 
 
 
-    def __init__(self, path, store_path, vocabulary=None, do_shuffle = True):
+    def __init__(self, path, vocabulary=None, do_shuffle = True):
         print("Reading data from {} ".format(path))
-        self.load_data(path, vocabulary, store_path)
+        self.load_data(path, vocabulary)
         self.shuffle = do_shuffle
 
 
 
-    def load_data(self, path, vocabulary, store_path):
+    def load_data(self, path, vocabulary):
         """ takes the path to the data file and loads the data into memory
             data is loaded into a tensor [samples, 30]
             TODO: at the moment this loads the entire file into memory, because it is then easier to
@@ -63,8 +63,6 @@ class DataLoader:
         if vocabulary is not None:
             voc = vocabulary.get_vocabulary_as_dict()
             self.data_num = np.array([voc.get(w, voc["<unk>"]) for w in self.data.reshape([-1])]).reshape(self.data.shape)
-
-        pickle.dump(self, open(store_path + "data_clean.pkl", "wb"))
         # TODO decide whether we still need self.data hereafter. If not, drop.
 
     def batch_iterator(self, num_epochs, batch_size):
