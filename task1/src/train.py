@@ -119,19 +119,25 @@ def main(unused_argv):
     # We learn sensible initial states as well. As I am unsure about whether
     # they are essentially the same, we train them seperately
     # TODO clarify what the two initial states mean
-    lstm_zero_state_1 = \
-        tf.get_variable("zero_state_1",
+    #
+    # the seem to correspond to the LSTM cell state and the hidden layer output
+    # see http://stackoverflow.com/questions/41789133/c-state-and-m-state-in-tensorflow-lstm
+    #https://www.tensorflow.org/api_docs/python/tf/contrib/rnn/LSTMStateTuple
+    lstm_zero_c = \
+        tf.get_variable("zero_state_c",
                         shape=[1, FLAGS.lstm_size],
                         dtype=tf.float32,
                         initializer=tf.contrib.layers.xavier_initializer())
-    lstm_zero_state_2 = \
-        tf.get_variable("zero_state_",
+    lstm_zero_h = \
+        tf.get_variable("zero_state_h",
                         shape=[1, FLAGS.lstm_size],
                         dtype=tf.float32,
                         initializer=tf.contrib.layers.xavier_initializer())
 
-    lstm_state = (tf.tile(lstm_zero_state_1, [tf.shape(input_words)[0], 1]),
-                  tf.tile(lstm_zero_state_2, [tf.shape(input_words)[0], 1]))
+    lstm_state = (tf.tile(lstm_zero_c, [tf.shape(input_words)[0], 1]),
+                  tf.tile(lstm_zero_h, [tf.shape(input_words)[0], 1]))
+
+
 
     if not FLAGS.task == "C":
         out_to_logit_w = tf.get_variable(
@@ -158,7 +164,7 @@ def main(unused_argv):
 
     probabilities = []
     loss = 0.0
-
+    lstm_outputs = []
     with tf.variable_scope("RNN"):
         for time_step in range(FLAGS.sentence_length):
             if time_step > 0:
@@ -170,10 +176,18 @@ def main(unused_argv):
             else:
                 logits = tf.matmul(tf.matmul(lstm_out, inter_w) + inter_b,
                                    out_to_logit_w) + out_to_logit_b
+            # TODO why are these accumlated in a list?
             probabilities.append(tf.nn.softmax(logits))
+            lstm_outputs.append(lstm_out)
+
             loss += tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=input_words[:, time_step],
                 logits=logits)
+        last_output = lstm_outputs[-1]
+
+    #add to collection for re-use in task 1.2
+    tf.add_to_collection("last_output", last_output)
+    tf.add_to_collection("input_words", input_words)
 
     # TODO Confirm that the elementwise crossentropy is -p(w_t|w_1,...,w_{t-1})
     perplexity = tf.pow(2.0, tf.reduce_mean(loss) / FLAGS.sentence_length)
@@ -197,7 +211,7 @@ def main(unused_argv):
         print("Start running the training")
 
         for data_train in batches_train:
-            gc_, _, pp_ = sess.run([global_counter, train_op, perplexity],
+            gc_, train_op_, pp_, lstm_out_, lstm_state_ =sess.run([global_counter, train_op, perplexity, last_output, lstm_state],
                                    feed_dict={input_words: data_train})
             if (gc_ % FLAGS.evaluate_every) == 0:
                 print("Iteration %s: Perplexity is %s" % (gc_, pp_))
@@ -209,7 +223,7 @@ def main(unused_argv):
         print("Starting validation")
         out_pp = []
         for data_eval in batches_eval:
-            out_pp += sess.run([perplexity])
+            out_pp += sess.run([perplexity], feed_dict={input_words:data_eval})
         np.savetext(
             FLAGS.output_dir + "/group25.perplexity" + FLAGS.task,
             np.array(out_pp), delimiter=',')
