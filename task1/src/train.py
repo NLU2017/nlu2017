@@ -60,6 +60,7 @@ print("")
 timestamp = str(int(time.time()))
 FLAGS.model_dir = os.path.abspath(os.path.join(FLAGS.log_dir, timestamp))
 print("Writing to {}\n".format(FLAGS.model_dir))
+os.makedirs(FLAGS.model_dir, exist_ok=True)
 
 
 def main(unused_argv):
@@ -104,7 +105,7 @@ def main(unused_argv):
             try:
                 external_embedding[v, :] = given_emb[k]
             except KeyError:
-                print("Unmached: %s" % k)
+                print("Unmatched: %s" % k)
                 external_embedding[v, :] = \
                     np.random.uniform(low=-0.25,
                                       high=0.25,
@@ -175,7 +176,7 @@ def main(unused_argv):
                 logits=logits)
 
     # TODO Confirm that the elementwise crossentropy is -p(w_t|w_1,...,w_{t-1})
-    perplexity = tf.pow(2, tf.reduce_mean(loss) / FLAGS.sentence_length)
+    perplexity = tf.pow(2.0, tf.reduce_mean(loss) / FLAGS.sentence_length)
 
     optimiser = tf.train.AdamOptimizer(FLAGS.learning_rate)
     gradients, v = zip(*optimiser.compute_gradients(loss))
@@ -186,25 +187,31 @@ def main(unused_argv):
                                          global_step=global_counter)
 
     init_op = tf.global_variables_initializer()
+    #Saver to save model checkpoints
+    saver = tf.train.Saver(max_to_keep=FLAGS.num_checkpoints, keep_checkpoint_every_n_hours=2)
 
     # loop over training batches
     with tf.Session() as sess:
         print("Initialising")
-        sess.run(init_op)  # TODO add saver and restore if needed
+        sess.run(init_op)
         print("Start running the training")
+
         for data_train in batches_train:
             gc_, _, pp_ = sess.run([global_counter, train_op, perplexity],
                                    feed_dict={input_words: data_train})
-            if gc_ % 100 == 0:
+            if (gc_ % FLAGS.evaluate_every) == 0:
                 print("Iteration %s: Perplexity is %s" % (gc_, pp_))
+            if (gc_ % FLAGS.checkpoint_every == 0):
+                ckpt_path = saver.save(sess, os.path.join(FLAGS.model_dir, 'model'), gc_)
+                print("Model saved in file: %s" % ckpt_path)
+
 
         print("Starting validation")
         out_pp = []
         for data_eval in batches_eval:
             out_pp += sess.run([perplexity])
-        # TODO find out group number
         np.savetext(
-            FLAGS.output_dir + "/groupXX.perplexity" + FLAGS.task,
+            FLAGS.output_dir + "/group25.perplexity" + FLAGS.task,
             np.array(out_pp), delimiter=',')
 
 
