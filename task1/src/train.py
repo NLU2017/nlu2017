@@ -113,6 +113,9 @@ def main(unused_argv):
         embedding_matrix = tf.Variable(external_embedding, dtype=tf.float32)
 
     input_words = tf.placeholder(tf.int32, [None, FLAGS.sentence_length])
+    #add to collection for usage from restored model
+    tf.add_to_collection("input_words", input_words)
+
     embedded_words = tf.nn.embedding_lookup(embedding_matrix, input_words)
     lstm = tf.contrib.rnn.BasicLSTMCell(FLAGS.lstm_size)
     # Somehow lstm has a touple of states instead of just one.
@@ -176,7 +179,6 @@ def main(unused_argv):
             else:
                 logits = tf.matmul(tf.matmul(lstm_out, inter_w) + inter_b,
                                    out_to_logit_w) + out_to_logit_b
-            # TODO why are these accumlated in a list?
             probabilities.append(tf.nn.softmax(logits))
             lstm_outputs.append(lstm_out)
 
@@ -184,13 +186,17 @@ def main(unused_argv):
                 labels=input_words[:, time_step],
                 logits=logits)
         last_output = lstm_outputs[-1]
+        last_prob = probabilities[-1]
 
     #add to collection for re-use in task 1.2
     tf.add_to_collection("last_output", last_output)
-    tf.add_to_collection("input_words", input_words)
+    tf.add_to_collection("last_prob", last_prob)
+
 
     # TODO Confirm that the elementwise crossentropy is -p(w_t|w_1,...,w_{t-1})
     perplexity = tf.pow(2.0, tf.reduce_mean(loss) / FLAGS.sentence_length)
+
+    tf.add_to_collection("perplexity", perplexity)
 
     optimiser = tf.train.AdamOptimizer(FLAGS.learning_rate)
     gradients, v = zip(*optimiser.compute_gradients(loss))

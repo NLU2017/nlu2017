@@ -40,8 +40,7 @@ def main(unused_argv):
         saver.restore(sess, tf.train.latest_checkpoint(FLAGS.log_dir))
 
         #TODO: which op do we really need??'
-        last_output = tf.get_collection("last_output")
-        input_words = tf.get_collection("input_words")
+        last_probs = tf.get_collection("last_probs")[0]
 
 
 
@@ -54,17 +53,16 @@ def main(unused_argv):
             sentences = []
             batches = start_data.batch_iterator(1, FLAGS.batch_size)
             for b in batches:
-                input = b
                 new_sentence = np.ndarray([FLAGS.batch_size, FLAGS.sentence_length ], dtype='object')
                 new_sentence[:, 0] = b[:,0]
                 for t in range(FLAGS.sentence_length):
 
 
-                    logits = sess.run([last_output], feed_dict= {input_words: new_sentence})
+                    logits = sess.run([last_probs], feed_dict= {input_words: new_sentence})
                     # get argmax(logits) or sample(logits)
                     best_match = tf.arg_max(logits)
                     for i in range(b.shape[0]):
-                        new_sentence[i, t+ 1] = if
+                        new_sentence[i, t+ 1] = None  #TODO take best_match or input word
                     has_word_in_sentence = not np.equals(b[:, t+1], Vocabulary.PADDING)
                     for i in
 
