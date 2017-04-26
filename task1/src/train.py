@@ -26,7 +26,7 @@ tf.flags.DEFINE_string("embedding", "../data/wordembeddings-dim100.word2vec",
 # Model parameters
 tf.flags.DEFINE_integer("lstm_size", 512, "Length of the hidden state")
 tf.flags.DEFINE_integer("embedding_size", 100, "Dimension of the embedding")
-tf.flags.DEFINE_string("task", "C", "Task to be solved")
+tf.flags.DEFINE_string("task", "A", "Task to be solved")
 tf.flags.DEFINE_integer("intermediate_size", 512,
                         "Dimension of down-projection in task C")
 
@@ -48,7 +48,7 @@ tf.flags.DEFINE_boolean("allow_soft_placement", True,
                         "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False,
                         "Log placement of ops on devices")
-tf.flags.DEFINE_boolean("force_init", False,
+tf.flags.DEFINE_boolean("force_init", True,
                         "Whether to always start training from scratch")
 
 FLAGS = tf.flags.FLAGS
