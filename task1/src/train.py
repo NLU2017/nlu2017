@@ -36,7 +36,7 @@ tf.flags.DEFINE_integer("num_epochs", 1,
                         "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("evaluate_every", 100,
                         "Evaluate model on dev set after this many steps (default: 100)")
-tf.flags.DEFINE_integer("checkpoint_every", 100,
+tf.flags.DEFINE_integer("checkpoint_every", 10000,
                         "Save model after this many steps (default: 100)")
 tf.flags.DEFINE_integer("num_checkpoints", 5,
                         "Number of checkpoints to store (default: 5)")
@@ -48,6 +48,8 @@ tf.flags.DEFINE_boolean("allow_soft_placement", True,
                         "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False,
                         "Log placement of ops on devices")
+tf.flags.DEFINE_boolean("force_init", False,
+                        "Whether to always start training from scratch")
 
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
@@ -177,6 +179,7 @@ def main(unused_argv):
 
     # TODO Confirm that the elementwise crossentropy is -p(w_t|w_1,...,w_{t-1})
     perplexity = tf.pow(2.0, tf.reduce_mean(loss) / FLAGS.sentence_length)
+    sentence_perplexity = tf.pow(2.0, loss / FLAGS.sentence_length)
 
     optimiser = tf.train.AdamOptimizer(FLAGS.learning_rate)
     gradients, v = zip(*optimiser.compute_gradients(loss))
@@ -188,32 +191,44 @@ def main(unused_argv):
 
     init_op = tf.global_variables_initializer()
     #Saver to save model checkpoints
-    saver = tf.train.Saver(max_to_keep=FLAGS.num_checkpoints, keep_checkpoint_every_n_hours=2)
+    saver = tf.train.Saver(max_to_keep=FLAGS.num_checkpoints,
+                           keep_checkpoint_every_n_hours=2)
 
     # loop over training batches
     with tf.Session() as sess:
-        print("Initialising")
-        sess.run(init_op)
-        print("Start running the training")
+        # Restoring or initialising session
+        if not FLAGS.force_init:
+            try:
+                saver.restore(sess, tf.train.latest_checkpoint(FLAGS.model_dir))
+                print("Recovered Session")
+            except:  # TODO find name for this exception (it does not accept the NotFoundError displayed if it does not find the save)
+                sess.run(init_op)
+                print("Unexpectedly initialised session")
+        else:
+            sess.run(init_op)
+            print("Initialised session")
 
+        print("Start training")
         for data_train in batches_train:
             gc_, _, pp_ = sess.run([global_counter, train_op, perplexity],
                                    feed_dict={input_words: data_train})
             if (gc_ % FLAGS.evaluate_every) == 0:
                 print("Iteration %s: Perplexity is %s" % (gc_, pp_))
             if (gc_ % FLAGS.checkpoint_every == 0):
-                ckpt_path = saver.save(sess, os.path.join(FLAGS.model_dir, 'model'), gc_)
+                ckpt_path = saver.save(sess, os.path.join(FLAGS.model_dir,
+                                                          'model'), gc_)
                 print("Model saved in file: %s" % ckpt_path)
 
-
-        print("Starting validation")
-        out_pp = []
+        print("Start validation")
+        out_pp = np.empty(0)
         for data_eval in batches_eval:
-            out_pp += sess.run([perplexity])
-        np.savetext(
+            out_pp = np.concatenate((out_pp, sess.run(sentence_perplexity,
+                                   feed_dict={input_words: data_eval})))
+        np.savetxt(
             FLAGS.output_dir + "/group25.perplexity" + FLAGS.task,
-            np.array(out_pp), delimiter=',')
-
+            np.array(out_pp),
+            fmt="%4.8f",
+            delimiter=',')
 
 if __name__ == '__main__':
     tf.app.run()
