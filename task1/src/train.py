@@ -117,6 +117,7 @@ def main(unused_argv):
     tf.add_to_collection("input_words", input_words)
 
     embedded_words = tf.nn.embedding_lookup(embedding_matrix, input_words)
+    tf.add_to_collection("embedded_words", embedded_words)
     lstm = tf.contrib.rnn.BasicLSTMCell(FLAGS.lstm_size)
     # Somehow lstm has a touple of states instead of just one.
     # We learn sensible initial states as well. As I am unsure about whether
