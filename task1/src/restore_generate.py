@@ -59,7 +59,7 @@ def main(unused_argv):
                     best_match = np.argmax(logits[0], axis=1)
                     next_word_in_input = b[:, t+1]
                     has_word_in_sentence = next_word_in_input != voc_dict[Vocabulary.PADDING]
-
+                    #add the next word of the input sentence for the next run or the best_fit from the model if the sentence input is exhausted
                     next_words = np.asarray(
                         [next_word_in_input[s] if has_word_in_sentence[s] else best_match[s] for s in range(b.shape[0])])
                     sentence_input[:, t + 1] = next_words
