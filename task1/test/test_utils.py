@@ -89,3 +89,21 @@ class VocabularyTest(unittest.TestCase):
         assert dict["drei"] == 0
         assert dict["zwei"] == 1
         assert dict["eins"] == 2
+
+    def test_invert_vocabulary_dict(self):
+        self.voc.load_file("./test_vocabulary.txt")
+        dict = self.voc.get_vocabulary_as_dict()
+        inverted = self.voc.get_inverse_voc_dict()
+        print(dict)
+        print(inverted)
+        for key, val in dict.items():
+            assert inverted[val] == key
+
+    def test_is_keyword(self):
+        self.voc.load_file("./test_vocabulary.txt")
+        assert not self.voc.is_known_keyword("drei")
+        assert not self.voc.is_known_keyword("<unk>")
+        assert self.voc.is_known_keyword("<eos>")
+        assert self.voc.is_known_keyword("<bos>")
+        assert self.voc.is_known_keyword("<pad>")
+

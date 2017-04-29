@@ -99,6 +99,7 @@ class Vocabulary:
     SPLIT = " "
     keywords = [PADDING, END_SEQ, INIT_SEQ, UNK]
 
+
     def load_file(self, path):
         wordcount = collections.Counter()
         with open(path) as file:
@@ -109,10 +110,25 @@ class Vocabulary:
         self.words.extend(Vocabulary.keywords)
 
     def get_vocabulary_as_dict(self):
-        return {k:v for v, k in enumerate(self.words)}
+        self.dict = {k:v for v, k in enumerate(self.words)}
+        return self.dict
+
+    def get_inverse_voc_dict(self):
+        self.inverse_dict = {k:v for v,k in self.dict.items()}
+        return self.inverse_dict
 
     def contains(self, word):
         """returns True if the word is one of the keywords
         or in the extracted vocabulary"""
         return word in self.words
+
+    def is_known_keyword(self, w):
+        return w in Vocabulary.keywords and w != Vocabulary.UNK
+
+    def translate_to_sentence(self, list_of_keys):
+        self.get_inverse_voc_dict()
+        words = [self.inverse_dict[w] if not self.is_known_keyword(self.inverse_dict[w]) else '' for w in
+                 list_of_keys]
+        result = ' '.join(words)
+        return result
 

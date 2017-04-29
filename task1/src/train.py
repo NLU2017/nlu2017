@@ -115,25 +115,35 @@ def main(unused_argv):
         embedding_matrix = tf.Variable(external_embedding, dtype=tf.float32)
 
     input_words = tf.placeholder(tf.int32, [None, FLAGS.sentence_length])
+    #add to collection for usage from restored model
+    tf.add_to_collection("input_words", input_words)
+
     embedded_words = tf.nn.embedding_lookup(embedding_matrix, input_words)
+    tf.add_to_collection("embedded_words", embedded_words)
     lstm = tf.contrib.rnn.BasicLSTMCell(FLAGS.lstm_size)
     # Somehow lstm has a touple of states instead of just one.
     # We learn sensible initial states as well. As I am unsure about whether
     # they are essentially the same, we train them seperately
     # TODO clarify what the two initial states mean
-    lstm_zero_state_1 = \
-        tf.get_variable("zero_state_1",
+    #
+    # the seem to correspond to the LSTM cell state and the hidden layer output
+    # see http://stackoverflow.com/questions/41789133/c-state-and-m-state-in-tensorflow-lstm
+    #https://www.tensorflow.org/api_docs/python/tf/contrib/rnn/LSTMStateTuple
+    lstm_zero_c = \
+        tf.get_variable("zero_state_c",
                         shape=[1, FLAGS.lstm_size],
                         dtype=tf.float32,
                         initializer=tf.contrib.layers.xavier_initializer())
-    lstm_zero_state_2 = \
-        tf.get_variable("zero_state_",
+    lstm_zero_h = \
+        tf.get_variable("zero_state_h",
                         shape=[1, FLAGS.lstm_size],
                         dtype=tf.float32,
                         initializer=tf.contrib.layers.xavier_initializer())
 
-    lstm_state = (tf.tile(lstm_zero_state_1, [tf.shape(input_words)[0], 1]),
-                  tf.tile(lstm_zero_state_2, [tf.shape(input_words)[0], 1]))
+    lstm_state = (tf.tile(lstm_zero_c, [tf.shape(input_words)[0], 1]),
+                  tf.tile(lstm_zero_h, [tf.shape(input_words)[0], 1]))
+
+
 
     if not FLAGS.task == "C":
         out_to_logit_w = tf.get_variable(
@@ -160,7 +170,7 @@ def main(unused_argv):
 
     probabilities = []
     loss = 0.0
-
+    lstm_outputs = []
     with tf.variable_scope("RNN"):
         for time_step in range(FLAGS.sentence_length):
             if time_step > 0:
@@ -173,13 +183,24 @@ def main(unused_argv):
                 logits = tf.matmul(tf.matmul(lstm_out, inter_w) + inter_b,
                                    out_to_logit_w) + out_to_logit_b
             probabilities.append(tf.nn.softmax(logits))
+            lstm_outputs.append(lstm_out)
+
             loss += tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=input_words[:, time_step],
                 logits=logits)
+        last_output = lstm_outputs[-1]
+        last_prob = probabilities[-1]
+
+    #add to collection for re-use in task 1.2
+    tf.add_to_collection("last_output", last_output)
+    tf.add_to_collection("last_prob", last_prob)
+
 
     # TODO Confirm that the elementwise crossentropy is -p(w_t|w_1,...,w_{t-1})
     perplexity = tf.pow(2.0, tf.reduce_mean(loss) / FLAGS.sentence_length)
     sentence_perplexity = tf.pow(2.0, loss / FLAGS.sentence_length)
+
+    tf.add_to_collection("perplexity", perplexity)
 
     optimiser = tf.train.AdamOptimizer(FLAGS.learning_rate)
     gradients, v = zip(*optimiser.compute_gradients(loss))
@@ -210,7 +231,7 @@ def main(unused_argv):
 
         print("Start training")
         for data_train in batches_train:
-            gc_, _, pp_ = sess.run([global_counter, train_op, perplexity],
+            gc_, train_op_, pp_, lstm_out_, lstm_state_ =sess.run([global_counter, train_op, perplexity, last_output, lstm_state],
                                    feed_dict={input_words: data_train})
             if (gc_ % FLAGS.evaluate_every) == 0:
                 print("Iteration %s: Perplexity is %s" % (gc_, pp_))
