@@ -1,0 +1,8 @@
+#!/bin/bash
+
+python3 train.py --task "A" --num_epochs 1
+python3 train.py --task "B" --num_epochs 1
+python3 train.py --task "C" --num_epochs 1 --lstm_size 1024
+
+# Shut down computer after the work is done
+# shutdown -P +5
