@@ -7,14 +7,14 @@ import csv
 
 
 
-tf.flags.DEFINE_string("cont_file_path", "../data/sentences.continuation_short",
+tf.flags.DEFINE_string("cont_file_path", "../data/sentences.continuation",
                        "Path to the continuation data (default ../data/sentences.continuation)")
 tf.flags.DEFINE_string("train_file_path", "../data/sentences.train",
                        "Path to the training data")
 tf.flags.DEFINE_integer("sentence_length", 20, "Length of the input sentences (default: 20)")
-tf.flags.DEFINE_string("log_dir", "../runs/1493459028", "Checkpoint directory")
-tf.flags.DEFINE_string("meta_graph_file", "model-400.meta", "Name of meta graph file")
-tf.flags.DEFINE_integer("batch_size", 8, "Batch size (default: 32)")
+tf.flags.DEFINE_string("log_dir", None, "Checkpoint directory (f.ex. ../runs/1493459028")
+tf.flags.DEFINE_string("meta_graph_file",None, "Name of meta graph file (f.ex.  model-400.meta)")
+tf.flags.DEFINE_integer("batch_size", 64, "Batch size (default: 64)")
 
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
