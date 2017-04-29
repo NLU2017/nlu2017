@@ -47,7 +47,7 @@ def main(unused_argv):
             batches = start_data.batch_iterator(1, FLAGS.batch_size)
             sentences = []
             for b in batches:
-                sentence_input = np.ndarray((FLAGS.batch_size, SentenceCleaner.LENGTH), dtype=np.int32)
+                sentence_input = np.ndarray((b.shape[0], SentenceCleaner.LENGTH), dtype=np.int32)
                 sentence_input.fill(voc_dict[Vocabulary.PADDING])
                 # there must be at least one word in the input sentence because the all start with <bos>
                 sentence_input[:, 0] = b[:,0]
@@ -75,7 +75,7 @@ def main(unused_argv):
         sentences.append(generate_sentence(sess, start_data))
         #TODO: print to file..
         np.savetxt(
-            FLAGS.output_dir + "/group25.continuation",
+            os.path.join(FLAGS.log_dir + "/group25.continuation"),
             np.asarray(sentences),
             fmt="%s",
             delimiter='\n')
