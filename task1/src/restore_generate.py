@@ -1,4 +1,3 @@
-import time
 import os
 import tensorflow as tf
 from utils import DataLoader
@@ -8,14 +7,14 @@ import csv
 
 
 
-tf.flags.DEFINE_string("cont_file_path", "../data/sentences.mycontinuation_short",
+tf.flags.DEFINE_string("cont_file_path", "../data/sentences.continuation",
                        "Path to the continuation data (default ../data/sentences.continuation)")
 tf.flags.DEFINE_string("train_file_path", "../data/sentences.train",
                        "Path to the training data")
 tf.flags.DEFINE_integer("sentence_length", 20, "Length of the input sentences (default: 20)")
-tf.flags.DEFINE_string("log_dir", "../runs/1493216462", "Checkpoint directory")
-tf.flags.DEFINE_string("meta_graph_file", "model-200.meta", "Name of meta graph file")
-tf.flags.DEFINE_integer("batch_size", 16, "Batch size (default: 32)")
+tf.flags.DEFINE_string("log_dir", "../runs/1493459028", "Checkpoint directory")
+tf.flags.DEFINE_string("meta_graph_file", "model-400.meta", "Name of meta graph file")
+tf.flags.DEFINE_integer("batch_size", 8, "Batch size (default: 32)")
 
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
@@ -61,7 +60,7 @@ def main(unused_argv):
                     has_word_in_sentence = next_word_in_input != voc_dict[Vocabulary.PADDING]
                     #add the next word of the input sentence for the next run or the best_fit from the model if the sentence input is exhausted
                     next_words = np.asarray(
-                        [next_word_in_input[s] if has_word_in_sentence[s] else best_match[s] for s in range(b.shape[0])])
+                        [next_word_in_input[s] if has_word_in_sentence[s] else                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   best_match[s] for s in range(b.shape[0])])
                     sentence_input[:, t + 1] = next_words
                 #translate back to Strings and store
                 #TODO how to deal with unknown words?
@@ -72,8 +71,14 @@ def main(unused_argv):
             return sentences
 
         #run it
-        sentences = generate_sentence(sess, start_data)
+        sentences = []
+        sentences.append(generate_sentence(sess, start_data))
         #TODO: print to file..
+        np.savetxt(
+            FLAGS.output_dir + "/group25.continuation",
+            np.asarray(sentences),
+            fmt="%s",
+            delimiter='\n')
 
 
 if __name__ == '__main__':
