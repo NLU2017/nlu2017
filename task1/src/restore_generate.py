@@ -7,7 +7,7 @@ import csv
 
 
 
-tf.flags.DEFINE_string("cont_file_path", "../data/sentences.continuation",
+tf.flags.DEFINE_string("cont_file_path", "../data/sentences.continuation_short",
                        "Path to the continuation data (default ../data/sentences.continuation)")
 tf.flags.DEFINE_string("train_file_path", "../data/sentences.train",
                        "Path to the training data")
@@ -58,12 +58,15 @@ def main(unused_argv):
                     best_match = np.argmax(logits[0], axis=1)
                     next_word_in_input = b[:, t+1]
                     has_word_in_sentence = next_word_in_input != voc_dict[Vocabulary.PADDING]
-                    #add the next word of the input sentence for the next run or the best_fit from the model if the sentence input is exhausted
-                    next_words = np.asarray(
-                        [next_word_in_input[s] if has_word_in_sentence[s] else                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   best_match[s] for s in range(b.shape[0])])
+                    #add the next word of the input sentence for the next run or the best_fit from the model
+                    # if the sentence input is exhausted
+                    next_words = np.asarray([next_word_in_input[s] if has_word_in_sentence[s] else
+                                             best_match[s] for s in range(b.shape[0])])
                     sentence_input[:, t + 1] = next_words
                 #translate back to Strings and store
                 #TODO how to deal with unknown words?
+                #at the moment we replace them by <unk> in the input data. should they be replace to to what they were
+                #or can we keep the <unk>
                 for sample in range(b.shape[0]):
                     result = vocabulary.translate_to_sentence(sentence_input[sample, :])
                     sentences.append(result)
@@ -73,7 +76,6 @@ def main(unused_argv):
         #run it
         sentences = []
         sentences.append(generate_sentence(sess, start_data))
-        #TODO: print to file..
         np.savetxt(
             os.path.join(FLAGS.log_dir + "/group25.continuation"),
             np.asarray(sentences),

@@ -98,6 +98,8 @@ class Vocabulary:
     UNK = "<unk>"
     SPLIT = " "
     keywords = [PADDING, END_SEQ, INIT_SEQ, UNK]
+    dict = None
+    inverse_dict = None
 
 
     def load_file(self, path):
@@ -125,10 +127,26 @@ class Vocabulary:
     def is_known_keyword(self, w):
         return w in Vocabulary.keywords and w != Vocabulary.UNK
 
+    def is_padding(self, word):
+        return word == Vocabulary.PADDING
+
+    def is_init(self, word):
+        return word == Vocabulary.INIT_SEQ
+
+    def is_init_or_pad(self, word_key):
+        """returns true if the word_key (integer coding) is either the key for <pad> or <bos>"""
+        if self.inverse_dict is None:
+            self.get_inverse_voc_dict()
+        try:
+            word = self.inverse_dict[word_key]
+        except KeyError:
+            return False
+        return self.is_init(word) or self.is_padding(word)
+
     def translate_to_sentence(self, list_of_keys):
         self.get_inverse_voc_dict()
-        words = [self.inverse_dict[w] if not self.is_known_keyword(self.inverse_dict[w]) else '' for w in
+        words = [self.inverse_dict[k] if not self.is_init_or_pad(k) else '' for k in
                  list_of_keys]
-        result = ' '.join(words)
+        result = ' '.join(words).strip()
         return result
 
