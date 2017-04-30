@@ -29,6 +29,7 @@ tf.flags.DEFINE_integer("embedding_size", 100, "Dimension of the embedding")
 tf.flags.DEFINE_string("task", "A", "Task to be solved")
 tf.flags.DEFINE_integer("intermediate_size", 512,
                         "Dimension of down-projection in task C")
+tf.flags.DEFINE_string("model_name", str(int(time.time())), "Name the model")
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
@@ -44,8 +45,15 @@ tf.flags.DEFINE_string("log_dir", "../runs/",
                        "Output directory (default: '../runs/')")
 tf.flags.DEFINE_float("learning_rate", 5e-3,
                       "Inital learning rate of the optimizer")
-tf.flags.DEFINE_integer("hlave_lr_every", 20000,
+tf.flags.DEFINE_integer("hlave_lr_every", 10000,
                         "Every n steps the learning rate is halved")
+tf.flags.DEFINE_float("dropout_rate", 0.5,
+                      "Dropout probs. (0.0 for no dropout)")
+tf.flags.DEFINE_integer("no_output_before_n", 500,
+                        "Supress the first outputs, because of strong changes")
+tf.flags.DEFINE_boolean("allow_batchnorm", True,
+                        "Allow or disallow batch normalisation")
+
 # Tensorflow Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True,
                         "Allow device soft device placement")
@@ -53,8 +61,7 @@ tf.flags.DEFINE_boolean("log_device_placement", False,
                         "Log placement of ops on devices")
 tf.flags.DEFINE_boolean("force_init", True,
                         "Whether to always start training from scratch")
-tf.flags.DEFINE_integer("no_output_before_n", 500,
-                        "Supress the first outputs, because of strong changes")
+
 
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
@@ -64,8 +71,7 @@ for attr, value in sorted(FLAGS.__flags.items()):
 print("")
 
 # Create a unique output directory for this experiment.
-timestamp = str(int(time.time()))
-FLAGS.model_dir = os.path.abspath(os.path.join(FLAGS.log_dir, timestamp))
+FLAGS.model_dir = os.path.abspath(os.path.join(FLAGS.log_dir, FLAGS.model_name))
 print("Writing to {}\n".format(FLAGS.model_dir))
 os.makedirs(FLAGS.model_dir, exist_ok=True)
 
@@ -130,8 +136,11 @@ def main(unused_argv):
 
     embedded_words = tf.nn.embedding_lookup(embedding_matrix, input_words)
 
-    embedded_words_bn = tf.layers.batch_normalization(embedded_words,
-                                                      training=is_training)
+    embedded_words_bn = \
+        tf.layers.batch_normalization(embedded_words,
+                                      training=is_training,
+                                      center=FLAGS.allow_batchnorm,
+                                      scale=FLAGS.allow_batchnorm)
     tf.add_to_collection("embedded_words", embedded_words_bn)
 
     # RNN graph
@@ -195,7 +204,9 @@ def main(unused_argv):
             lstm_out, lstm_state = lstm(embedded_words_bn[:, time_step, :],
                                         lstm_state)
 
-            lstm_out_drop = tf.layers.dropout(lstm_out, training=is_training)
+            lstm_out_drop = tf.layers.dropout(lstm_out,
+                                              rate=FLAGS.dropout_rate,
+                                              training=is_training)
 
             ##TODO is this correct to calculate the fully connected layers and loss
             ## inside the loop over the sentence length and not having one layer over

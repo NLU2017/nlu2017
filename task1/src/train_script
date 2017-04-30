@@ -1,8 +1,13 @@
 #!/bin/bash
 
-python3 train.py --task "A" --num_epochs 1
-python3 train.py --task "B" --num_epochs 1
-python3 train.py --task "C" --num_epochs 1 --lstm_size 1024
+python3 train.py --task "A" --num_epochs 1 --allow_batchnorm False --dropout_rate 0.0 --model_name "A_Vanilla"
+python3 train.py --task "A" --num_epochs 1 --allow_batchnorm True --dropout_rate 0.0 --model_name "A_BN"
+python3 train.py --task "A" --num_epochs 1 --allow_batchnorm False --dropout_rate 0.5 --model_name "A_drop"
+python3 train.py --task "A" --num_epochs 1 --allow_batchnorm True --dropout_rate 0.5 --model_name "A_BN_drop"
+python3 train.py --task "B" --num_epochs 1 --allow_batchnorm False --dropout_rate 0.0 --model_name "B_Vanilla"
+python3 train.py --task "B" --num_epochs 1 --allow_batchnorm True --dropout_rate 0.5 --model_name "B_BN_drop"
+python3 train.py --task "C" --num_epochs 1 --lstm_size 1024 --allow_batchnorm False --dropout_rate 0.0 --model_name "C_Vanilla"
+python3 train.py --task "C" --num_epochs 1 --lstm_size 1024 --allow_batchnorm True --dropout_rate 0.5 --model_name "C__BN_drop"
 
 # Shut down computer after the work is done
-# shutdown -P +5
+shutdown -P +5
