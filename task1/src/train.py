@@ -226,6 +226,13 @@ def main(unused_argv):
         labels=input_words,
         logits=logits_reshaped) / np.log(2)
 
+    # Sanity check
+    any_word = input_words[10, 5]
+    any_word_probs = tf.nn.softmax(logits_reshaped[10, 5, :])
+    any_word_max_prob = tf.reduce_max(any_word_probs)
+    any_word_prediction = tf.argmax(any_word_probs, dimension=0)
+
+
     #output of the last layer in the unrolled LSTM
     last_output = lstm_outputs[-1]
     last_prob = tf.nn.softmax(logits)
@@ -297,7 +304,11 @@ def main(unused_argv):
 
         print("Start training")
         for data_train in batches_train:
-            ms_, gc_, pp_, last_out_,last_prob_, _ =sess.run([merged_summaries, global_counter, perplexity,last_output,last_prob, train_op],
+            ms_, gc_, pp_, last_out_,last_prob_, _,\
+                word, max_p, pred =\
+                sess.run([merged_summaries, global_counter, perplexity,
+                          last_output,last_prob, train_op,
+                          any_word, any_word_max_prob, any_word_prediction],
                                    feed_dict={input_words: data_train,
                                               is_training: True})
 
@@ -313,6 +324,9 @@ def main(unused_argv):
                 print("Model saved in file: %s" % ckpt_path)
             if gc_ % FLAGS.hlave_lr_every == 0 & gc_ > 0:
                 eff_rate /= 2
+
+            if gc_ % 50 == 0:
+                print("Target: %s, max prob: %s, predicted: %s" % (word, max_p, pred))
 
         print("Start validation")
         out_pp = np.empty(0)
