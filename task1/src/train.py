@@ -34,9 +34,9 @@ tf.flags.DEFINE_integer("intermediate_size", 512,
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
 tf.flags.DEFINE_integer("num_epochs", 1,
                         "Number of training epochs (default: 200)")
-tf.flags.DEFINE_integer("evaluate_every", 100,
+tf.flags.DEFINE_integer("evaluate_every", 50,
                         "Evaluate model on dev set after this many steps (default: 100)")
-tf.flags.DEFINE_integer("checkpoint_every", 10000,
+tf.flags.DEFINE_integer("checkpoint_every", 1000,
                         "Save model after this many steps (default: 100)")
 tf.flags.DEFINE_integer("num_checkpoints", 5,
                         "Number of checkpoints to store (default: 5)")
@@ -83,6 +83,8 @@ def main(unused_argv):
 
     # Create the graph
     global_counter = tf.Variable(0, trainable=False)
+
+
     if FLAGS.task == "A":
         # For a) the embedding is a matrix to be learned from scratch
         embedding_matrix = tf.get_variable(
@@ -120,11 +122,12 @@ def main(unused_argv):
 
     embedded_words = tf.nn.embedding_lookup(embedding_matrix, input_words)
     tf.add_to_collection("embedded_words", embedded_words)
+
+    #RNN graph
     lstm = tf.contrib.rnn.BasicLSTMCell(FLAGS.lstm_size)
     # Somehow lstm has a touple of states instead of just one.
     # We learn sensible initial states as well. As I am unsure about whether
     # they are essentially the same, we train them seperately
-    # TODO clarify what the two initial states mean
     #
     # the seem to correspond to the LSTM cell state and the hidden layer output
     # see http://stackoverflow.com/questions/41789133/c-state-and-m-state-in-tensorflow-lstm
@@ -168,41 +171,58 @@ def main(unused_argv):
             initializer=tf.contrib.layers.xavier_initializer())
         out_to_logit_b = tf.Variable(tf.zeros([FLAGS.vocab_size]))
 
-    probabilities = []
+    #initialize
+
     loss = 0.0
+    probabilities = []
     lstm_outputs = []
+    #add summaries for tensorboard
+
     with tf.variable_scope("RNN"):
         for time_step in range(FLAGS.sentence_length):
             if time_step > 0:
                 tf.get_variable_scope().reuse_variables()
             lstm_out, lstm_state = lstm(embedded_words[:, time_step, :],
                                         lstm_state)
+            ##TODO is this correct to calculate the fully connected layers and loss
+            ## inside the loop over the sentence length and not having one layer over
+            ## the entire unrolled LSTM
             if not FLAGS.task == "C":
                 logits = tf.matmul(lstm_out, out_to_logit_w) + out_to_logit_b
             else:
                 logits = tf.matmul(tf.matmul(lstm_out, inter_w) + inter_b,
                                    out_to_logit_w) + out_to_logit_b
+
             probabilities.append(tf.nn.softmax(logits))
             lstm_outputs.append(lstm_out)
-
             loss += tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=input_words[:, time_step],
                 logits=logits)
+
+        #output of the last layer in the unrolled LSTM
         last_output = lstm_outputs[-1]
         last_prob = probabilities[-1]
 
     #add to collection for re-use in task 1.2
     tf.add_to_collection("last_output", last_output)
     tf.add_to_collection("last_prob", last_prob)
+    tf.summary.histogram("last_prob", last_prob)
 
-
+    #define perplexity and add to collection to provide access when reloading the model elsewhere
+    # add a summary scalar for tensorboard
     # TODO Confirm that the elementwise crossentropy is -p(w_t|w_1,...,w_{t-1})
-    perplexity = tf.pow(2.0, tf.reduce_mean(loss) / FLAGS.sentence_length)
-    sentence_perplexity = tf.pow(2.0, loss / FLAGS.sentence_length)
-
+    mean_loss = tf.reduce_mean(loss)
+    tf.summary.scalar('loss', mean_loss)
+    perplexity = tf.pow(2.0, mean_loss / FLAGS.sentence_length)
     tf.add_to_collection("perplexity", perplexity)
+    tf.summary.scalar('perplexity', perplexity)
 
+    sentence_perplexity = tf.pow(2.0, loss / FLAGS.sentence_length)
+    tf.summary.histogram('sPerplexity', sentence_perplexity)
+
+    # TODO add learning_rate to summaries
     optimiser = tf.train.AdamOptimizer(FLAGS.learning_rate)
+
     gradients, v = zip(*optimiser.compute_gradients(loss))
     # TODO from the doc it looks as if we actually wanted to set use_norm to 10 instead. Confirm!
     # https://www.tensorflow.org/api_docs/python/tf/clip_by_global_norm
@@ -210,13 +230,20 @@ def main(unused_argv):
     train_op = optimiser.apply_gradients(zip(clipped_gradients, v),
                                          global_step=global_counter)
 
+    #initialize the Variables
     init_op = tf.global_variables_initializer()
     #Saver to save model checkpoints
     saver = tf.train.Saver(max_to_keep=FLAGS.num_checkpoints,
                            keep_checkpoint_every_n_hours=2)
 
+
     # loop over training batches
     with tf.Session() as sess:
+        # Summary Filewriter
+        train_summary_dir = os.path.join(FLAGS.model_dir, "summary", "train")
+        train_summary_writer = tf.summary.FileWriter(train_summary_dir, sess.graph)
+        merged_summaries = tf.summary.merge_all()
+
         # Restoring or initialising session
         if not FLAGS.force_init:
             try:
@@ -231,8 +258,10 @@ def main(unused_argv):
 
         print("Start training")
         for data_train in batches_train:
-            gc_, train_op_, pp_, lstm_out_, lstm_state_ =sess.run([global_counter, train_op, perplexity, last_output, lstm_state],
+            ms_, gc_, pp_, last_out_,last_prob_, _ =sess.run([merged_summaries, global_counter, perplexity,last_output,last_prob, train_op],
                                    feed_dict={input_words: data_train})
+            train_summary_writer.add_summary(ms_,gc_)
+
             if (gc_ % FLAGS.evaluate_every) == 0:
                 print("Iteration %s: Perplexity is %s" % (gc_, pp_))
             if (gc_ % FLAGS.checkpoint_every == 0):
