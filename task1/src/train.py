@@ -191,8 +191,6 @@ def main(unused_argv):
         out_to_logit_b = tf.Variable(tf.zeros([FLAGS.vocab_size]))
 
     #initialize
-
-    probabilities = []
     lstm_outputs = []
     #add summaries for tensorboard
 
@@ -205,11 +203,12 @@ def main(unused_argv):
 
             lstm_outputs.append(lstm_out)
 
-        output = tf.concat(axis=0, values=lstm_outputs)
+    # output = tf.concat(axis=0, values=lstm_outputs)
+    output = tf.reshape(tf.concat(axis=1, values=lstm_outputs), [-1, FLAGS.lstm_size])
 
-        lstm_out_drop = tf.layers.dropout(output,
-                                          rate=FLAGS.dropout_rate,
-                                          training=is_training)
+    lstm_out_drop = tf.layers.dropout(output,
+                                      rate=FLAGS.dropout_rate,
+                                      training=is_training)
 
     if not FLAGS.task == "C":
         logits = tf.matmul(lstm_out_drop, out_to_logit_w) + out_to_logit_b
