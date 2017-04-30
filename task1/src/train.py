@@ -47,7 +47,7 @@ tf.flags.DEFINE_float("learning_rate", 5e-3,
                       "Inital learning rate of the optimizer")
 tf.flags.DEFINE_integer("hlave_lr_every", 10000,
                         "Every n steps the learning rate is halved")
-tf.flags.DEFINE_float("dropout_rate", 0.5,
+tf.flags.DEFINE_float("dropout_rate", 0.0,
                       "Dropout probs. (0.0 for no dropout)")
 tf.flags.DEFINE_integer("no_output_before_n", 500,
                         "Supress the first outputs, because of strong changes")
@@ -203,8 +203,10 @@ def main(unused_argv):
 
             lstm_outputs.append(lstm_out)
 
-    # output = tf.concat(axis=0, values=lstm_outputs)
-    output = tf.reshape(tf.concat(axis=1, values=lstm_outputs), [-1, FLAGS.lstm_size])
+    output_raw = lstm_outputs
+
+    output = tf.concat(axis=0, values=lstm_outputs)
+    # output = tf.reshape(tf.concat(axis=1, values=lstm_outputs), [-1, FLAGS.lstm_size])
 
     lstm_out_drop = tf.layers.dropout(output,
                                       rate=FLAGS.dropout_rate,
@@ -216,10 +218,13 @@ def main(unused_argv):
         logits = tf.matmul(tf.matmul(lstm_out_drop, inter_w) + inter_b,
                            out_to_logit_w) + out_to_logit_b
 
+    logits_reshaped = tf.transpose(tf.reshape(logits,
+                                              [FLAGS.sentence_length, -1,
+                                               FLAGS.vocab_size]), [1, 0, 2])
+
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
         labels=input_words,
-        logits=tf.reshape(logits, [-1, FLAGS.sentence_length,
-                                   FLAGS.vocab_size])) / np.log(2)
+        logits=logits_reshaped) / np.log(2)
 
     #output of the last layer in the unrolled LSTM
     last_output = lstm_outputs[-1]
@@ -299,7 +304,7 @@ def main(unused_argv):
             if gc_ > FLAGS.no_output_before_n:
                 train_summary_writer.add_summary(ms_, gc_)
 
-            if (gc_ % FLAGS.evaluate_every) == 0 and gc_ > 0:
+            if (gc_ % FLAGS.evaluate_every) == 0 or gc_ == 1:
                 print("Iteration %s: Perplexity is %s" % (gc_, pp_))
 
             if (gc_ % FLAGS.checkpoint_every == 0) and gc_ > 0:
