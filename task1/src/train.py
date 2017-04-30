@@ -297,13 +297,14 @@ def main(unused_argv):
             ms_, gc_, pp_, last_out_,last_prob_, _ =sess.run([merged_summaries, global_counter, perplexity,last_output,last_prob, train_op],
                                    feed_dict={input_words: data_train,
                                               is_training: True})
-            train_summary_writer.add_summary(ms_,gc_)
 
-            if (gc_ % FLAGS.evaluate_every) == 0 and \
-                            gc_ > FLAGS.no_output_before_n:
+            if gc_ > FLAGS.no_output_before_n:
+                train_summary_writer.add_summary(ms_, gc_)
+
+            if (gc_ % FLAGS.evaluate_every) == 0 and gc_ > 0:
                 print("Iteration %s: Perplexity is %s" % (gc_, pp_))
-            if (gc_ % FLAGS.checkpoint_every == 0 and
-                        gc_ > FLAGS.no_output_before_n):
+
+            if (gc_ % FLAGS.checkpoint_every == 0) and gc_ > 0:
                 ckpt_path = saver.save(sess, os.path.join(FLAGS.model_dir,
                                                           'model'), gc_)
                 print("Model saved in file: %s" % ckpt_path)
