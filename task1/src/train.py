@@ -192,7 +192,6 @@ def main(unused_argv):
 
     #initialize
 
-    loss = 0.0
     probabilities = []
     lstm_outputs = []
     #add summaries for tensorboard
@@ -204,28 +203,28 @@ def main(unused_argv):
             lstm_out, lstm_state = lstm(embedded_words_bn[:, time_step, :],
                                         lstm_state)
 
-            lstm_out_drop = tf.layers.dropout(lstm_out,
-                                              rate=FLAGS.dropout_rate,
-                                              training=is_training)
-
-            ##TODO is this correct to calculate the fully connected layers and loss
-            ## inside the loop over the sentence length and not having one layer over
-            ## the entire unrolled LSTM
-            if not FLAGS.task == "C":
-                logits = tf.matmul(lstm_out_drop, out_to_logit_w) + out_to_logit_b
-            else:
-                logits = tf.matmul(tf.matmul(lstm_out_drop, inter_w) + inter_b,
-                                   out_to_logit_w) + out_to_logit_b
-
-            probabilities.append(tf.nn.softmax(logits))
             lstm_outputs.append(lstm_out)
-            loss += tf.nn.sparse_softmax_cross_entropy_with_logits(
-                labels=input_words[:, time_step],
-                logits=logits)
 
-        #output of the last layer in the unrolled LSTM
-        last_output = lstm_outputs[-1]
-        last_prob = probabilities[-1]
+        output = tf.concat(axis=0, values=lstm_outputs)
+
+        lstm_out_drop = tf.layers.dropout(output,
+                                          rate=FLAGS.dropout_rate,
+                                          training=is_training)
+
+    if not FLAGS.task == "C":
+        logits = tf.matmul(lstm_out_drop, out_to_logit_w) + out_to_logit_b
+    else:
+        logits = tf.matmul(tf.matmul(lstm_out_drop, inter_w) + inter_b,
+                           out_to_logit_w) + out_to_logit_b
+
+    loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        labels=input_words,
+        logits=tf.reshape(logits, [-1, FLAGS.sentence_length,
+                                   FLAGS.vocab_size])) / np.log(2)
+
+    #output of the last layer in the unrolled LSTM
+    last_output = lstm_outputs[-1]
+    last_prob = tf.nn.softmax(logits)
 
     #add to collection for re-use in task 1.2
     tf.add_to_collection("last_output", last_output)
@@ -235,13 +234,13 @@ def main(unused_argv):
     #define perplexity and add to collection to provide access when reloading the model elsewhere
     # add a summary scalar for tensorboard
     # TODO Confirm that the elementwise crossentropy is -p(w_t|w_1,...,w_{t-1})
-    mean_loss = tf.reduce_mean(loss) / np.log(2)
+    mean_loss = tf.reduce_mean(loss)
     tf.summary.scalar('loss', mean_loss)
-    perplexity = tf.pow(2.0, mean_loss / FLAGS.sentence_length)
+    perplexity = tf.pow(2.0, mean_loss)
     tf.add_to_collection("perplexity", perplexity)
     tf.summary.scalar('perplexity', perplexity)
 
-    sentence_perplexity = tf.pow(2.0, loss / FLAGS.sentence_length)
+    sentence_perplexity = tf.pow(2.0, tf.reduce_mean(loss, axis=1))
     tf.summary.histogram('sPerplexity', sentence_perplexity)
 
     # TODO add learning_rate to summaries
