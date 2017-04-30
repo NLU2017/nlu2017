@@ -113,20 +113,20 @@ def main(unused_argv):
                                       high=0.25,
                                       size=FLAGS.embedding_size)
         embedding_matrix = tf.Variable(external_embedding, dtype=tf.float32)
-
+    is_training = tf.placeholder(tf.bool)
     input_words = tf.placeholder(tf.int32, [None, FLAGS.sentence_length])
     #add to collection for usage from restored model
     tf.add_to_collection("input_words", input_words)
 
     embedded_words = tf.nn.embedding_lookup(embedding_matrix, input_words)
-    tf.add_to_collection("embedded_words", embedded_words)
+    embedded_words_bn = tf.layers.batch_normalization(embedded_words,
+                                                      training=is_training)
+    tf.add_to_collection("embedded_words", embedded_words_bn)
     lstm = tf.contrib.rnn.BasicLSTMCell(FLAGS.lstm_size)
     # Somehow lstm has a touple of states instead of just one.
-    # We learn sensible initial states as well. As I am unsure about whether
-    # they are essentially the same, we train them seperately
-    # TODO clarify what the two initial states mean
-    #
-    # the seem to correspond to the LSTM cell state and the hidden layer output
+    # We learn sensible initial states as well.
+
+    # The states seem to correspond to the LSTM cell state and the hidden layer output
     # see http://stackoverflow.com/questions/41789133/c-state-and-m-state-in-tensorflow-lstm
     #https://www.tensorflow.org/api_docs/python/tf/contrib/rnn/LSTMStateTuple
     lstm_zero_c = \
@@ -175,12 +175,15 @@ def main(unused_argv):
         for time_step in range(FLAGS.sentence_length):
             if time_step > 0:
                 tf.get_variable_scope().reuse_variables()
-            lstm_out, lstm_state = lstm(embedded_words[:, time_step, :],
+            lstm_out, lstm_state = lstm(embedded_words_bn[:, time_step, :],
                                         lstm_state)
+
+            lstm_out_drop = tf.layers.dropout(lstm_out, training=is_training)
+
             if not FLAGS.task == "C":
-                logits = tf.matmul(lstm_out, out_to_logit_w) + out_to_logit_b
+                logits = tf.matmul(lstm_out_drop, out_to_logit_w) + out_to_logit_b
             else:
-                logits = tf.matmul(tf.matmul(lstm_out, inter_w) + inter_b,
+                logits = tf.matmul(tf.matmul(lstm_out_drop, inter_w) + inter_b,
                                    out_to_logit_w) + out_to_logit_b
             probabilities.append(tf.nn.softmax(logits))
             lstm_outputs.append(lstm_out)
@@ -197,7 +200,7 @@ def main(unused_argv):
 
 
     # TODO Confirm that the elementwise crossentropy is -p(w_t|w_1,...,w_{t-1})
-    perplexity = tf.pow(2.0, tf.reduce_mean(loss) / FLAGS.sentence_length)
+    perplexity = tf.pow(2.0, tf.reduce_mean(loss) / FLAGS.sentence_length / np.log(2))
     sentence_perplexity = tf.pow(2.0, loss / FLAGS.sentence_length)
 
     tf.add_to_collection("perplexity", perplexity)
@@ -215,6 +218,18 @@ def main(unused_argv):
     saver = tf.train.Saver(max_to_keep=FLAGS.num_checkpoints,
                            keep_checkpoint_every_n_hours=2)
 
+    # Get an idea of the overall size of the model
+    total_parameters = 0
+    for variable in tf.trainable_variables():
+        shape = variable.get_shape()
+        print(shape)
+        variable_parametes = 1
+        for dim in shape:
+            variable_parametes *= dim.value
+        total_parameters += variable_parametes
+    print("Built a graph with a total of %d trainable parameters" % (
+        total_parameters))
+
     # loop over training batches
     with tf.Session() as sess:
         # Restoring or initialising session
@@ -231,8 +246,11 @@ def main(unused_argv):
 
         print("Start training")
         for data_train in batches_train:
-            gc_, train_op_, pp_, lstm_out_, lstm_state_ =sess.run([global_counter, train_op, perplexity, last_output, lstm_state],
-                                   feed_dict={input_words: data_train})
+            gc_, train_op_, pp_, lstm_out_, lstm_state_ =\
+                sess.run([global_counter, train_op, perplexity,
+                          last_output, lstm_state],
+                         feed_dict={input_words: data_train,
+                                    is_training: True})
             if (gc_ % FLAGS.evaluate_every) == 0:
                 print("Iteration %s: Perplexity is %s" % (gc_, pp_))
             if (gc_ % FLAGS.checkpoint_every == 0):
@@ -244,7 +262,8 @@ def main(unused_argv):
         out_pp = np.empty(0)
         for data_eval in batches_eval:
             out_pp = np.concatenate((out_pp, sess.run(sentence_perplexity,
-                                   feed_dict={input_words: data_eval})))
+                                   feed_dict={input_words: data_eval,
+                                              is_training: False})))
         np.savetxt(
             FLAGS.output_dir + "/group25.perplexity" + FLAGS.task,
             np.array(out_pp),
