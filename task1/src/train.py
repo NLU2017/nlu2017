@@ -42,7 +42,10 @@ tf.flags.DEFINE_integer("num_checkpoints", 5,
                         "Number of checkpoints to store (default: 5)")
 tf.flags.DEFINE_string("log_dir", "../runs/",
                        "Output directory (default: '../runs/')")
-tf.flags.DEFINE_float("learning_rate", 1e-4, "Learning rate of the optimizer")
+tf.flags.DEFINE_float("learning_rate", 5e-3,
+                      "Inital learning rate of the optimizer")
+tf.flags.DEFINE_integer("hlave_lr_every", 20000,
+                        "Every n steps the learning rate is halved")
 # Tensorflow Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True,
                         "Allow device soft device placement")
@@ -66,6 +69,9 @@ os.makedirs(FLAGS.model_dir, exist_ok=True)
 
 
 def main(unused_argv):
+    # Initialise learning rate
+    eff_rate = FLAGS.learning_rate
+
     # extract the vocabulary from training sentendes
     vocabulary = Vocabulary()
     vocabulary.load_file(FLAGS.train_file_path)
@@ -280,12 +286,14 @@ def main(unused_argv):
                                               is_training: True})
             train_summary_writer.add_summary(ms_,gc_)
 
-            if (gc_ % FLAGS.evaluate_every) == 0:
+            if (gc_ % FLAGS.evaluate_every) == 0 and gc_ > 0:
                 print("Iteration %s: Perplexity is %s" % (gc_, pp_))
-            if (gc_ % FLAGS.checkpoint_every == 0):
+            if (gc_ % FLAGS.checkpoint_every == 0 and gc_ > 0):
                 ckpt_path = saver.save(sess, os.path.join(FLAGS.model_dir,
                                                           'model'), gc_)
                 print("Model saved in file: %s" % ckpt_path)
+            if gc_ % FLAGS.hlave_lr_every == 0 & gc_ > 0:
+                eff_rate /= 2
 
         print("Start validation")
         out_pp = np.empty(0)
