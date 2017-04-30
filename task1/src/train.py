@@ -53,6 +53,8 @@ tf.flags.DEFINE_boolean("log_device_placement", False,
                         "Log placement of ops on devices")
 tf.flags.DEFINE_boolean("force_init", True,
                         "Whether to always start training from scratch")
+tf.flags.DEFINE_integer("no_output_before_n", 500,
+                        "Supress the first outputs, because of strong changes")
 
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
@@ -286,9 +288,11 @@ def main(unused_argv):
                                               is_training: True})
             train_summary_writer.add_summary(ms_,gc_)
 
-            if (gc_ % FLAGS.evaluate_every) == 0 and gc_ > 0:
+            if (gc_ % FLAGS.evaluate_every) == 0 and \
+                            gc_ > FLAGS.no_output_before_n:
                 print("Iteration %s: Perplexity is %s" % (gc_, pp_))
-            if (gc_ % FLAGS.checkpoint_every == 0 and gc_ > 0):
+            if (gc_ % FLAGS.checkpoint_every == 0 and
+                        gc_ > FLAGS.no_output_before_n):
                 ckpt_path = saver.save(sess, os.path.join(FLAGS.model_dir,
                                                           'model'), gc_)
                 print("Model saved in file: %s" % ckpt_path)
