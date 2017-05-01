@@ -107,3 +107,38 @@ class VocabularyTest(unittest.TestCase):
         assert self.voc.is_known_keyword("<bos>")
         assert self.voc.is_known_keyword("<pad>")
 
+    def test_is_padding(self):
+        self.voc.load_file("./test_vocabulary.txt")
+        assert not self.voc.is_padding("drei")
+        assert not self.voc.is_padding("zwei")
+        assert not self.voc.is_padding("foo")
+
+        assert not self.voc.is_padding("<unk>")
+        assert not self.voc.is_padding("<eos>")
+        assert not self.voc.is_padding("<bos>")
+        assert self.voc.is_padding("<pad>")
+
+    def test_is_padding(self):
+        self.voc.load_file("./test_vocabulary.txt")
+        assert not self.voc.is_init("drei")
+        assert not self.voc.is_init("zwei")
+        assert not self.voc.is_init("foo")
+
+        assert not self.voc.is_init("<unk>")
+        assert not self.voc.is_init("<eos>")
+        assert  self.voc.is_init("<bos>")
+        assert not self.voc.is_init("<pad>")
+
+    def test_is_pad_or_init(self):
+        self.voc.load_file("./test_vocabulary.txt")
+        dict = self.voc.get_vocabulary_as_dict()
+        assert not self.voc.is_init_or_pad(dict["drei"])
+        assert not self.voc.is_init_or_pad(dict["zwei"])
+        assert not self.voc.is_init_or_pad(50000)
+
+        assert not self.voc.is_init_or_pad(dict["<unk>"])
+        assert not self.voc.is_init_or_pad(dict["<eos>"])
+        assert self.voc.is_init_or_pad(dict["<bos>"])
+        assert self.voc.is_init_or_pad(dict["<pad>"])
+
+
