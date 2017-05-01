@@ -223,8 +223,8 @@ def main(unused_argv):
                                                FLAGS.vocab_size]), [1, 0, 2])
 
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        labels=input_words,
-        logits=logits_reshaped) / np.log(2)
+        labels=input_words[:, 1:],
+        logits=logits_reshaped[:, :-1]) / np.log(2)
 
     # Sanity check
     any_word = input_words[10, 5]
