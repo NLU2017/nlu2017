@@ -1,8 +1,7 @@
 import time
 import os
 import tensorflow as tf
-from utils import DataLoader
-from utils import Vocabulary
+from utils import Vocabulary, DataLoader
 import numpy as np
 import csv
 
@@ -62,7 +61,6 @@ tf.flags.DEFINE_boolean("log_device_placement", False,
 tf.flags.DEFINE_boolean("force_init", True,
                         "Whether to always start training from scratch")
 
-
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
 print("\nCommand-line Arguments:")
@@ -71,7 +69,8 @@ for attr, value in sorted(FLAGS.__flags.items()):
 print("")
 
 # Create a unique output directory for this experiment.
-FLAGS.model_dir = os.path.abspath(os.path.join(FLAGS.log_dir, FLAGS.model_name))
+FLAGS.model_dir = os.path.abspath(
+    os.path.join(FLAGS.log_dir, FLAGS.model_name))
 print("Writing to {}\n".format(FLAGS.model_dir))
 os.makedirs(FLAGS.model_dir, exist_ok=True)
 
@@ -97,7 +96,6 @@ def main(unused_argv):
 
     # Create the graph
     global_counter = tf.Variable(0, trainable=False)
-
 
     if FLAGS.task == "A":
         # For a) the embedding is a matrix to be learned from scratch
@@ -131,7 +129,7 @@ def main(unused_argv):
         embedding_matrix = tf.Variable(external_embedding, dtype=tf.float32)
     is_training = tf.placeholder(tf.bool)
     input_words = tf.placeholder(tf.int32, [None, FLAGS.sentence_length])
-    #add to collection for usage from restored model
+    # add to collection for usage from restored model
     tf.add_to_collection("input_words", input_words)
 
     embedded_words = tf.nn.embedding_lookup(embedding_matrix, input_words)
@@ -150,7 +148,7 @@ def main(unused_argv):
 
     # The states seem to correspond to the LSTM cell state and the hidden layer output
     # see http://stackoverflow.com/questions/41789133/c-state-and-m-state-in-tensorflow-lstm
-    #https://www.tensorflow.org/api_docs/python/tf/contrib/rnn/LSTMStateTuple
+    # https://www.tensorflow.org/api_docs/python/tf/contrib/rnn/LSTMStateTuple
     lstm_zero_c = \
         tf.get_variable("zero_state_c",
                         shape=[1, FLAGS.lstm_size],
@@ -164,8 +162,6 @@ def main(unused_argv):
 
     lstm_state = (tf.tile(lstm_zero_c, [tf.shape(input_words)[0], 1]),
                   tf.tile(lstm_zero_h, [tf.shape(input_words)[0], 1]))
-
-
 
     if not FLAGS.task == "C":
         out_to_logit_w = tf.get_variable(
@@ -190,9 +186,9 @@ def main(unused_argv):
             initializer=tf.contrib.layers.xavier_initializer())
         out_to_logit_b = tf.Variable(tf.zeros([FLAGS.vocab_size]))
 
-    #initialize
+    # initialize
     lstm_outputs = []
-    #add summaries for tensorboard
+    # add summaries for tensorboard
 
     with tf.variable_scope("RNN"):
         for time_step in range(FLAGS.sentence_length):
@@ -224,34 +220,41 @@ def main(unused_argv):
 
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
         labels=input_words[:, 1:],
-        logits=logits_reshaped[:, :-1]) / np.log(2)
+        logits=logits_reshaped[:, :-1, :]) / np.log(2) * \
+           tf.to_float(tf.not_equal(input_words[:, 1:],
+                                    vocabulary.dict[vocabulary.PADDING]))
 
     # Sanity check
     any_word = input_words[10, 5]
     any_word_probs = tf.nn.softmax(logits_reshaped[10, 5, :])
     any_word_max_prob = tf.reduce_max(any_word_probs)
     any_word_prediction = tf.argmax(any_word_probs, dimension=0)
+    any_word_real_perp = 1 / any_word_probs[any_word]
 
-
-    #output of the last layer in the unrolled LSTM
+    # output of the last layer in the unrolled LSTM
     last_output = lstm_outputs[-1]
     last_prob = tf.nn.softmax(logits)
 
-    #add to collection for re-use in task 1.2
+    # add to collection for re-use in task 1.2
     tf.add_to_collection("last_output", last_output)
     tf.add_to_collection("last_prob", last_prob)
     tf.summary.histogram("last_prob", last_prob)
 
-    #define perplexity and add to collection to provide access when reloading the model elsewhere
+    # define perplexity and add to collection to provide access when reloading the model elsewhere
     # add a summary scalar for tensorboard
     # TODO Confirm that the elementwise crossentropy is -p(w_t|w_1,...,w_{t-1})
-    mean_loss = tf.reduce_mean(loss)
+    mean_loss = tf.reduce_sum(loss) / tf.reduce_sum(
+        tf.to_float(tf.not_equal(input_words[:, 1:],
+                                 vocabulary.dict[vocabulary.PADDING])))
     tf.summary.scalar('loss', mean_loss)
     perplexity = tf.pow(2.0, mean_loss)
     tf.add_to_collection("perplexity", perplexity)
     tf.summary.scalar('perplexity', perplexity)
 
-    sentence_perplexity = tf.pow(2.0, tf.reduce_mean(loss, axis=1))
+    sentence_perplexity = \
+        tf.pow(2.0, tf.reduce_sum(loss, axis=1) / tf.reduce_sum(tf.to_float(
+            tf.not_equal(input_words[:, 1:],
+                         vocabulary.dict[vocabulary.PADDING])), axis=1))
     tf.summary.histogram('sPerplexity', sentence_perplexity)
 
     # TODO add learning_rate to summaries
@@ -264,9 +267,9 @@ def main(unused_argv):
     train_op = optimiser.apply_gradients(zip(clipped_gradients, v),
                                          global_step=global_counter)
 
-    #initialize the Variables
+    # initialize the Variables
     init_op = tf.global_variables_initializer()
-    #Saver to save model checkpoints
+    # Saver to save model checkpoints
     saver = tf.train.Saver(max_to_keep=FLAGS.num_checkpoints,
                            keep_checkpoint_every_n_hours=2)
 
@@ -288,12 +291,14 @@ def main(unused_argv):
     with tf.Session() as sess:
         # Summary Filewriter
         train_summary_dir = os.path.join(FLAGS.model_dir, "summary", "train")
-        train_summary_writer = tf.summary.FileWriter(train_summary_dir, sess.graph)
+        train_summary_writer = tf.summary.FileWriter(train_summary_dir,
+                                                     sess.graph)
 
         # Restoring or initialising session
         if not FLAGS.force_init:
             try:
-                saver.restore(sess, tf.train.latest_checkpoint(FLAGS.model_dir))
+                saver.restore(sess,
+                              tf.train.latest_checkpoint(FLAGS.model_dir))
                 print("Recovered Session")
             except:  # TODO find name for this exception (it does not accept the NotFoundError displayed if it does not find the save)
                 sess.run(init_op)
@@ -304,13 +309,14 @@ def main(unused_argv):
 
         print("Start training")
         for data_train in batches_train:
-            ms_, gc_, pp_, last_out_,last_prob_, _,\
-                word, max_p, pred =\
+            ms_, gc_, pp_, last_out_, last_prob_, _, \
+            word, max_p, pred, perp_of_true = \
                 sess.run([merged_summaries, global_counter, perplexity,
-                          last_output,last_prob, train_op,
-                          any_word, any_word_max_prob, any_word_prediction],
-                                   feed_dict={input_words: data_train,
-                                              is_training: True})
+                          last_output, last_prob, train_op,
+                          any_word, any_word_max_prob, any_word_prediction,
+                          any_word_real_perp],
+                         feed_dict={input_words: data_train,
+                                    is_training: True})
 
             if gc_ > FLAGS.no_output_before_n:
                 train_summary_writer.add_summary(ms_, gc_)
@@ -326,19 +332,24 @@ def main(unused_argv):
                 eff_rate /= 2
 
             if gc_ % 50 == 0:
-                print("Target: %s, max prob: %s, predicted: %s" % (word, max_p, pred))
+                print(
+                    "Target: %s, Perplexity of target: %s,  "
+                    "max prob: %s, predicted: %s" % (word, perp_of_true,
+                                                     max_p, pred))
 
         print("Start validation")
         out_pp = np.empty(0)
         for data_eval in batches_eval:
             out_pp = np.concatenate((out_pp, sess.run(sentence_perplexity,
-                                   feed_dict={input_words: data_eval,
-                                              is_training: False})))
+                                                      feed_dict={
+                                                          input_words: data_eval,
+                                                          is_training: False})))
         np.savetxt(
             FLAGS.output_dir + "/group25.perplexity" + FLAGS.task,
             np.array(out_pp),
             fmt="%4.8f",
             delimiter=',')
+
 
 if __name__ == '__main__':
     tf.app.run()
