@@ -3,18 +3,19 @@ import tensorflow as tf
 from utils import DataLoader
 from utils import Vocabulary, SentenceCleaner
 import numpy as np
-import csv
 
 
 
-tf.flags.DEFINE_string("cont_file_path", "../data/sentences.continuation",
+
+
+tf.flags.DEFINE_string("cont_file_path", "../data/sentences.continuation_short",
                        "Path to the continuation data (default ../data/sentences.continuation)")
 tf.flags.DEFINE_string("train_file_path", "../data/sentences.train",
                        "Path to the training data")
 tf.flags.DEFINE_integer("sentence_length", 20, "Length of the input sentences (default: 20)")
-tf.flags.DEFINE_string("log_dir", None, "Checkpoint directory (f.ex. ../runs/1493459028")
-tf.flags.DEFINE_string("meta_graph_file",None, "Name of meta graph file (f.ex.  model-400.meta)")
-tf.flags.DEFINE_integer("batch_size", 64, "Batch size (default: 64)")
+tf.flags.DEFINE_string("log_dir", "../runs/1493665877", "Checkpoint directory")
+tf.flags.DEFINE_string("meta_graph_file", "model-400.meta", "Name of meta graph file")
+tf.flags.DEFINE_integer("batch_size", 8, "Batch size (default: 32)")
 
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
@@ -28,10 +29,12 @@ def main(unused_argv):
     vocabulary = Vocabulary()
     vocabulary.load_file(FLAGS.train_file_path)
     voc_dict = vocabulary.get_vocabulary_as_dict()
+    vocabulary.get_inverse_voc_dict()
 
     # load training data
     start_data = DataLoader(FLAGS.cont_file_path,
-                              vocabulary, do_shuffle=False)
+                              vocabulary, do_shuffle=False, is_partial=True)
+
 
     with tf.Session() as sess:
         # Restore computation graph.
@@ -39,8 +42,9 @@ def main(unused_argv):
         # Restore variables.
         saver.restore(sess, tf.train.latest_checkpoint(FLAGS.log_dir))
 
-        last_prob = tf.get_collection("last_prob")[0]
+        last_prob = tf.get_collection('last_prob')[0]
         input_words = tf.get_collection('input_words')[0]
+        is_training = tf.get_collection('is_training')[0]
 
         def generate_sentence(sess, start_data):
 
@@ -50,15 +54,19 @@ def main(unused_argv):
                 sentence_input = np.ndarray((b.shape[0], SentenceCleaner.LENGTH), dtype=np.int32)
                 sentence_input.fill(voc_dict[Vocabulary.PADDING])
                 # there must be at least one word in the input sentence because the all start with <bos>
-                sentence_input[:, 0] = b[:,0]
-                for t in range(FLAGS.sentence_length):
-                    #print("running with input: {}".format(sentence_input))
-                    logits = sess.run([last_prob], feed_dict= {input_words: sentence_input})
+                sentence_input[:, 0:2] = b[:,0:2]
+                for t in range(1, FLAGS.sentence_length):
+                    logits = sess.run([last_prob], feed_dict= {input_words: sentence_input, is_training:False})
                     # get argmax(logits) along dimension 1 (= size of dictionary)
+                    print(len(logits))
+                    print(logits[0].shape)
                     best_match = np.argmax(logits[0], axis=1)
+                    print_word("best_match", best_match, vocabulary)
+
                     next_word_in_input = b[:, t+1]
+                    print_word("next_input", next_word_in_input, vocabulary)
                     has_word_in_sentence = next_word_in_input != voc_dict[Vocabulary.PADDING]
-                    #add the next word of the input sentence for the next run or the best_fit from the model
+                    #add the next word of the input sentence for the next run or the best_fit from the model if the sentence input is exhausted
                     # if the sentence input is exhausted
                     next_words = np.asarray([next_word_in_input[s] if has_word_in_sentence[s] else
                                              best_match[s] for s in range(b.shape[0])])
@@ -81,6 +89,12 @@ def main(unused_argv):
             np.asarray(sentences),
             fmt="%s",
             delimiter='\n')
+
+
+def print_word(text, index_vector, vocabulary):
+    print(text)
+    for i in range(index_vector.shape[0]):
+        print("{}: {} = {}".format(i, index_vector[i], vocabulary.inverse_dict[index_vector[i]]))
 
 
 if __name__ == '__main__':

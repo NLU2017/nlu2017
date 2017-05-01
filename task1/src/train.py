@@ -31,12 +31,12 @@ tf.flags.DEFINE_integer("intermediate_size", 512,
 tf.flags.DEFINE_string("model_name", str(int(time.time())), "Name the model")
 
 # Training parameters
-tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
+tf.flags.DEFINE_integer("batch_size", 8, "Batch Size (default: 64)")
 tf.flags.DEFINE_integer("num_epochs", 1,
                         "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("evaluate_every", 50,
                         "Evaluate model on dev set after this many steps (default: 100)")
-tf.flags.DEFINE_integer("checkpoint_every", 1000,
+tf.flags.DEFINE_integer("checkpoint_every", 100,
                         "Save model after this many steps (default: 100)")
 tf.flags.DEFINE_integer("num_checkpoints", 5,
                         "Number of checkpoints to store (default: 5)")
@@ -48,7 +48,7 @@ tf.flags.DEFINE_integer("hlave_lr_every", 10000,
                         "Every n steps the learning rate is halved")
 tf.flags.DEFINE_float("dropout_rate", 0.0,
                       "Dropout probs. (0.0 for no dropout)")
-tf.flags.DEFINE_integer("no_output_before_n", 500,
+tf.flags.DEFINE_integer("no_output_before_n", 0,
                         "Supress the first outputs, because of strong changes")
 tf.flags.DEFINE_boolean("allow_batchnorm", True,
                         "Allow or disallow batch normalisation")
@@ -128,6 +128,7 @@ def main(unused_argv):
                                       size=FLAGS.embedding_size)
         embedding_matrix = tf.Variable(external_embedding, dtype=tf.float32)
     is_training = tf.placeholder(tf.bool)
+    tf.add_to_collection("is_training", is_training)
     input_words = tf.placeholder(tf.int32, [None, FLAGS.sentence_length])
     # add to collection for usage from restored model
     tf.add_to_collection("input_words", input_words)
@@ -214,6 +215,7 @@ def main(unused_argv):
         logits = tf.matmul(tf.matmul(lstm_out_drop, inter_w) + inter_b,
                            out_to_logit_w) + out_to_logit_b
 
+
     logits_reshaped = tf.transpose(tf.reshape(logits,
                                               [FLAGS.sentence_length, -1,
                                                FLAGS.vocab_size]), [1, 0, 2])
@@ -225,8 +227,8 @@ def main(unused_argv):
                                     vocabulary.dict[vocabulary.PADDING]))
 
     # Sanity check
-    any_word = input_words[10, 5]
-    any_word_probs = tf.nn.softmax(logits_reshaped[10, 5, :])
+    any_word = input_words[1, 5]
+    any_word_probs = tf.nn.softmax(logits_reshaped[1, 5, :])
     any_word_max_prob = tf.reduce_max(any_word_probs)
     any_word_prediction = tf.argmax(any_word_probs, dimension=0)
     any_word_real_perp = 1 / any_word_probs[any_word]

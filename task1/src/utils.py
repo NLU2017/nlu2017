@@ -10,7 +10,7 @@ class SentenceCleaner:
     LENGTH = 30
 
 
-    def prepare_sentence(self, input_string):
+    def prepare_sentence(self, input_string, is_partial = False):
         """
         takes any input sentence (string of words separated by \" \" (SPACE) and resturns a
         numpy array which
@@ -20,7 +20,10 @@ class SentenceCleaner:
             - contains up to 28 words from the input sentence in between
             - if the sentence is shorter the array is padded with <pad>
         """
-        words = ([Vocabulary.INIT_SEQ] + input_string.strip().split(Vocabulary.SPLIT) + [Vocabulary.END_SEQ])[:30]
+        if(is_partial):
+            words = ([Vocabulary.INIT_SEQ] + input_string.strip().split(Vocabulary.SPLIT))[:30]
+        else:
+            words = ([Vocabulary.INIT_SEQ] + input_string.strip().split(Vocabulary.SPLIT) + [Vocabulary.END_SEQ])[:30]
         line_array = np.full([SentenceCleaner.LENGTH], Vocabulary.PADDING, dtype='object')
         line_array[0:len(words)] = words
         return line_array
@@ -37,14 +40,14 @@ class DataLoader:
 
 
 
-    def __init__(self, path, vocabulary=None, do_shuffle = True):
+    def __init__(self, path, vocabulary=None, do_shuffle = True, is_partial=False):
         print("Reading data from {} ".format(path))
-        self.load_data(path, vocabulary)
+        self.load_data(path, vocabulary, is_partial)
         self.shuffle = do_shuffle
 
 
 
-    def load_data(self, path, vocabulary):
+    def load_data(self, path, vocabulary, partial_sentence):
         """ takes the path to the data file and loads the data into memory
             data is loaded into a tensor [samples, 30]
             TODO: at the moment this loads the entire file into memory, because it is then easier to
@@ -54,7 +57,7 @@ class DataLoader:
         list = []
         with open(path) as file:
             for line in file:
-                list.append(DataLoader.cleaner.prepare_sentence(line))
+                list.append(DataLoader.cleaner.prepare_sentence(line, is_partial=partial_sentence))
         self.data = np.array(list)
         print("Start translation")
         if vocabulary is not None:
