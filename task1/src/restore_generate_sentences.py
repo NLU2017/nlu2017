@@ -13,9 +13,9 @@ tf.flags.DEFINE_string("cont_file_path", "../data/sentences.continuation_short",
 tf.flags.DEFINE_string("train_file_path", "../data/sentences.train",
                        "Path to the training data")
 tf.flags.DEFINE_integer("sentence_length", 20, "Length of the input sentences (default: 20)")
-tf.flags.DEFINE_string("log_dir", "../runs/1493665877", "Checkpoint directory")
-tf.flags.DEFINE_string("meta_graph_file", "model-400.meta", "Name of meta graph file")
-tf.flags.DEFINE_integer("batch_size", 8, "Batch size (default: 32)")
+tf.flags.DEFINE_string("log_dir", "../runs/1493753490", "Checkpoint directory")
+tf.flags.DEFINE_string("meta_graph_file", "model-200.meta", "Name of meta graph file")
+tf.flags.DEFINE_integer("batch_size", 32, "Batch size (default: 32)")
 
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
@@ -56,20 +56,19 @@ def main(unused_argv):
                 # there must be at least one word in the input sentence because the all start with <bos>
                 sentence_input[:, 0:2] = b[:,0:2]
                 for t in range(1, FLAGS.sentence_length):
-                    logits = sess.run([last_prob], feed_dict= {input_words: sentence_input, is_training:False})
+                    logits = sess.run(last_prob, feed_dict= {input_words: sentence_input, is_training:False})
                     # get argmax(logits) along dimension 1 (= size of dictionary)
-                    print(len(logits))
-                    print(logits[0].shape)
-                    best_match = np.argmax(logits[0], axis=1)
-                    print_word("best_match", best_match, vocabulary)
+                    best_match = np.argmax(logits, axis=1)
+                    #print_word("best_match", best_match, vocabulary)
 
                     next_word_in_input = b[:, t+1]
-                    print_word("next_input", next_word_in_input, vocabulary)
+                    #print_word("next_from_input", next_word_in_input, vocabulary)
                     has_word_in_sentence = next_word_in_input != voc_dict[Vocabulary.PADDING]
                     #add the next word of the input sentence for the next run or the best_fit from the model if the sentence input is exhausted
                     # if the sentence input is exhausted
                     next_words = np.asarray([next_word_in_input[s] if has_word_in_sentence[s] else
                                              best_match[s] for s in range(b.shape[0])])
+                    #print_word("next_words", next_words, vocabulary)
                     sentence_input[:, t + 1] = next_words
                 #translate back to Strings and store
                 #TODO how to deal with unknown words?
@@ -92,9 +91,9 @@ def main(unused_argv):
 
 
 def print_word(text, index_vector, vocabulary):
-    print(text)
+
     for i in range(index_vector.shape[0]):
-        print("{}: {} = {}".format(i, index_vector[i], vocabulary.inverse_dict[index_vector[i]]))
+        print("{} {}: {} = {}".format(text, i, index_vector[i], vocabulary.inverse_dict[index_vector[i]]))
 
 
 if __name__ == '__main__':

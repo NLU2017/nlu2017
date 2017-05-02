@@ -200,10 +200,7 @@ def main(unused_argv):
 
             lstm_outputs.append(lstm_out)
 
-    output_raw = lstm_outputs
-
     output = tf.concat(axis=0, values=lstm_outputs)
-    # output = tf.reshape(tf.concat(axis=1, values=lstm_outputs), [-1, FLAGS.lstm_size])
 
     lstm_out_drop = tf.layers.dropout(output,
                                       rate=FLAGS.dropout_rate,
@@ -235,7 +232,7 @@ def main(unused_argv):
 
     # output of the last layer in the unrolled LSTM
     last_output = lstm_outputs[-1]
-    last_prob = tf.nn.softmax(logits)
+    last_prob = tf.nn.softmax(logits_reshaped[:, -1, :])
 
     # add to collection for re-use in task 1.2
     tf.add_to_collection("last_output", last_output)
