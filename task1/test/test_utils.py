@@ -8,6 +8,7 @@ from utils import Vocabulary
 import numpy as np
 
 
+
 class SentenceCleanerTest(unittest.TestCase):
     if __name__ == '__main__':
         unittest.main()
@@ -23,7 +24,7 @@ class SentenceCleanerTest(unittest.TestCase):
     def test_SentenceCleaner_array_ends_with_is_eos(self):
         sentence = "lorem ipsum dolor sit amet , consetetur"
         append_split = self.cleaner.prepare_sentence(sentence)
-        assert append_split[-1] == Vocabulary.END_SEQ
+        assert append_split[8] == Vocabulary.END_SEQ
 
     def test_SentenceCleaner_returns_array_with_shape_30(self):
         sentence = "Aliquam ut mattis felis , vel accumsan orci . Donec arcu dolor , luctus in nibh id , rutrum consequat elit . Phasellus sed dolor maximus , euismod quam sed , varius tellus . Fusce condimentum libero in ante lobortis"
@@ -33,8 +34,17 @@ class SentenceCleanerTest(unittest.TestCase):
     def test_array_is_padded(self):
         sentence = "lorem ipsum dolor sit amet , consetetur"
         ar = self.cleaner.prepare_sentence(sentence)
-        for i in range(8, 29):
+        assert ar[8] == Vocabulary.END_SEQ
+        for i in range(9, 29):
             assert ar[i] == Vocabulary.PADDING
+
+    def test_array_is_padded_for_partial_sentence(self):
+        sentence = "lorem ipsum dolor sit amet , consetetur"
+        ar = self.cleaner.prepare_sentence(sentence, is_partial=True)
+        assert ar[8] == Vocabulary.PADDING
+        for i in range(9, 29):
+            assert ar[i] == Vocabulary.PADDING
+
 
 
 class DataLoaderTest(unittest.TestCase):
@@ -42,12 +52,15 @@ class DataLoaderTest(unittest.TestCase):
         unittest.main()
 
     def setUp(self):
-        self.loader = DataLoader("./test_sentences.txt", None, do_shuffle=False)
+        self.voc = Vocabulary()
+        self.voc.load_file("./test_sentences.txt")
+        self.loader = DataLoader("./test_sentences.txt", self.voc, do_shuffle=False)
 
     def test_loadFileIntoMemory(self):
         # loading data is done in constructor
-        assert self.loader.data is not None
-        assert self.loader.data.shape == (6, 30)
+        assert self.loader.data_num is not None
+        assert self.loader.data_num.shape == (6, 30)
+
 
     def test_iterate_over_all_epochs_and_batches(self):
         batches = self.loader.batch_iterator(3, 3)
@@ -57,6 +70,15 @@ class DataLoaderTest(unittest.TestCase):
             count += 1
             assert i.shape == (3, 30)
         assert count == 6
+
+    def test_each_sentence_has_bos_eos(self):
+        assert np.sum(np.equal(self.loader.data, Vocabulary.END_SEQ)) == self.loader.data.shape[0]
+        assert np.sum(np.equal(self.loader.data, Vocabulary.INIT_SEQ)) == self.loader.data.shape[0]
+
+    def test_load_partial_sentence_no_eos(self):
+        self.loader = DataLoader("./test_sentences.txt", self.voc, do_shuffle=False, is_partial=True)
+        assert np.sum(np.equal(self.loader.data, Vocabulary.END_SEQ)) == 0
+        assert np.sum(np.equal(self.loader.data, Vocabulary.INIT_SEQ)) == self.loader.data.shape[0]
 
 
 class VocabularyTest(unittest.TestCase):
