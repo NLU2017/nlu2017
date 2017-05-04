@@ -3,8 +3,7 @@ import tensorflow as tf
 from utils import DataLoader
 from utils import Vocabulary, SentenceCleaner
 import numpy as np
-
-
+from tensorflow.python.tools.inspect_checkpoint import print_tensors_in_checkpoint_file
 
 
 
@@ -13,9 +12,9 @@ tf.flags.DEFINE_string("cont_file_path", "../data/sentences.continuation_short",
 tf.flags.DEFINE_string("train_file_path", "../data/sentences.train",
                        "Path to the training data")
 tf.flags.DEFINE_integer("sentence_length", 20, "Length of the input sentences (default: 20)")
-tf.flags.DEFINE_string("log_dir", "../runs/1493753490", "Checkpoint directory")
-tf.flags.DEFINE_string("meta_graph_file", "model-200.meta", "Name of meta graph file")
-tf.flags.DEFINE_integer("batch_size", 32, "Batch size (default: 32)")
+tf.flags.DEFINE_string("log_dir", None, "Checkpoint directory (f.ex. ../runs/1493459028")
+tf.flags.DEFINE_string("meta_graph_file",None, "Name of meta graph file (f.ex.  model-400.meta)")
+tf.flags.DEFINE_integer("batch_size", 64, "Batch size (default: 64)")
 
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
@@ -41,12 +40,17 @@ def main(unused_argv):
         saver = tf.train.import_meta_graph(os.path.join(FLAGS.log_dir, FLAGS.meta_graph_file))
         # Restore variables.
         saver.restore(sess, tf.train.latest_checkpoint(FLAGS.log_dir))
+        print_tensors_in_checkpoint_file(os.path.join(FLAGS.log_dir, 'model-200'), tensor_name='', all_tensors=True)
 
         last_prob = tf.get_collection('last_prob')[0]
         input_words = tf.get_collection('input_words')[0]
         is_training = tf.get_collection('is_training')[0]
+        last_state = tf.get_collection('last_state')[0]
 
-        def generate_sentence(sess, start_data):
+        #create a graph with 1 state
+
+
+        def generate_sentence(sess, start_data, init_state):
 
             batches = start_data.batch_iterator(1, FLAGS.batch_size)
             sentences = []
