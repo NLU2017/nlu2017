@@ -130,6 +130,9 @@ class Vocabulary:
     def is_padding(self, word):
         return word == Vocabulary.PADDING
 
+    def get_padding_key(self):
+        return self.dict[Vocabulary.PADDING]
+
     def is_init(self, word):
         return word == Vocabulary.INIT_SEQ
 

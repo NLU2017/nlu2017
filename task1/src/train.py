@@ -38,7 +38,7 @@ tf.flags.DEFINE_integer("evaluate_every", 50,
                         "Evaluate model on dev set after this many steps (default: 100)")
 tf.flags.DEFINE_integer("checkpoint_every", 1000,
                         "Save model after this many steps (default: 100)")
-tf.flags.DEFINE_integer("num_checkpoints", 5,
+tf.flags.DEFINE_integer("num_checkpoints", 3,
                         "Number of checkpoints to store (default: 5)")
 tf.flags.DEFINE_string("log_dir", "../runs/",
                        "Output directory (default: '../runs/')")
@@ -170,7 +170,7 @@ def main(unused_argv):
             shape=[FLAGS.lstm_size, FLAGS.vocab_size],
             dtype=tf.float32,
             initializer=tf.contrib.layers.xavier_initializer())
-        out_to_logit_b = tf.Variable(tf.zeros([FLAGS.vocab_size]))
+        out_to_logit_b = tf.get_variable("output_bias", shape=[FLAGS.vocab_size])
     else:
         inter_w = tf.get_variable("intermediate_weights",
                                   shape=[FLAGS.lstm_size,
@@ -185,7 +185,7 @@ def main(unused_argv):
             shape=[FLAGS.intermediate_size, FLAGS.vocab_size],
             dtype=tf.float32,
             initializer=tf.contrib.layers.xavier_initializer())
-        out_to_logit_b = tf.Variable(tf.zeros([FLAGS.vocab_size]))
+        out_to_logit_b = tf.get_variable("output_bias", shape = [FLAGS.vocab_size])
 
     # initialize
     lstm_outputs = []
