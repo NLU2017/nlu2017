@@ -153,3 +153,19 @@ class Vocabulary:
         result = ' '.join(words).strip()
         return result
 
+
+
+def clean_and_cut_sentences(out_sentences):
+    sentences = []
+    for i in range(out_sentences.shape[0]):
+        words = []
+        j = 1
+        write = True
+        while (write and j <= 20):
+            words.append(out_sentences[i][j])
+            if out_sentences[i][j] == Vocabulary.END_SEQ:
+                write = False
+            j = j + 1
+
+        sentences.append(' '.join(words))
+    return sentences

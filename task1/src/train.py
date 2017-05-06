@@ -2,7 +2,7 @@ import pickle
 import time
 import os
 import tensorflow as tf
-from utils import Vocabulary, DataLoader
+from utils import Vocabulary, DataLoader, clean_and_cut_sentences
 import numpy as np
 import csv
 
@@ -404,11 +404,15 @@ def main(unused_argv):
         sentence_together = np.vstack(sentences)
         out_sentences = np.array([translator[x] for x in sentence_together.reshape([-1])]).reshape([-1, FLAGS.sentence_length])
 
+        clean_and_cut_sentences(out_sentences)
+
         np.savetxt(
             FLAGS.output_dir + "/group25.generated" + FLAGS.task,
-            np.array(out_sentences),
+            np.array(sentences),
             fmt="%s",
-            delimiter=' ')
+            delimiter='\n')
+
+
 
 if __name__ == '__main__':
     tf.app.run()
