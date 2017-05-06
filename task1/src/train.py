@@ -355,6 +355,8 @@ def main(unused_argv):
                     print("Model saved in file: %s" % ckpt_path)
                 if gc_ % FLAGS.hlave_lr_every == 0 & gc_ > 0:
                     eff_rate /= 2
+                    print("Adjusted learning rate")
+                    print(eff_rate)
 
                 if gc_ % 250 == 0:
                     print(
