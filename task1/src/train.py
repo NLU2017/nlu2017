@@ -14,6 +14,8 @@ tf.flags.DEFINE_string("train_file_path", "../data/sentences.train",
                        "Path to the training data")
 tf.flags.DEFINE_string("eval_file_path", "../data/sentences.eval",
                        "Path to the validation data")
+tf.flags.DEFINE_string("generate_file_path", "../data/sentences.continuation",
+                       "Source file for incomplete sentences")
 tf.flags.DEFINE_integer("sentence_length", 30, "Length of the input sentences")
 tf.flags.DEFINE_integer("vocab_size", 20000,
                         "Number of words in the vocabulary")
@@ -21,6 +23,9 @@ tf.flags.DEFINE_string("output_dir", "../data",
                        "Directory to store the results")
 tf.flags.DEFINE_string("embedding", "../data/wordembeddings-dim100.word2vec",
                        "Path to the embedding file (space separated)")
+tf.flags.DEFINE_boolean("do_train", False, "Perform training")
+tf.flags.DEFINE_boolean("do_eval", False, "Perform evaluation")
+tf.flags.DEFINE_boolean("do_generate", True, "Perform generation")
 
 # Model parameters
 tf.flags.DEFINE_integer("lstm_size", 512, "Length of the hidden state")
@@ -28,7 +33,7 @@ tf.flags.DEFINE_integer("embedding_size", 100, "Dimension of the embedding")
 tf.flags.DEFINE_string("task", "A", "Task to be solved")
 tf.flags.DEFINE_integer("intermediate_size", 512,
                         "Dimension of down-projection in task C")
-tf.flags.DEFINE_string("model_name", str(int(time.time())), "Name the model")
+tf.flags.DEFINE_string("model_name", "A_Vanilla", "Name the model")
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
@@ -84,15 +89,24 @@ def main(unused_argv):
     vocabulary.load_file(FLAGS.train_file_path)
 
     # load training data
-    train_loader = DataLoader(FLAGS.train_file_path,
-                              vocabulary, do_shuffle=True)
-    batches_train = train_loader.batch_iterator(FLAGS.num_epochs,
-                                                FLAGS.batch_size)
+    if FLAGS.do_train:
+        train_loader = DataLoader(FLAGS.train_file_path,
+                                  vocabulary, do_shuffle=True)
+        batches_train = train_loader.batch_iterator(FLAGS.num_epochs,
+                                                    FLAGS.batch_size)
 
     # load validation data
-    eval_loader = DataLoader(FLAGS.eval_file_path,
-                             vocabulary, do_shuffle=False)
-    batches_eval = eval_loader.batch_iterator(num_epochs=1, batch_size=1000)
+    if FLAGS.do_eval:
+        eval_loader = DataLoader(FLAGS.eval_file_path,
+                                 vocabulary, do_shuffle=False)
+        batches_eval = eval_loader.batch_iterator(num_epochs=1,
+                                                  batch_size=1000)
+
+    # Load continuation data
+    if FLAGS.do_generate:
+        gen_loader = DataLoader(FLAGS.generate_file_path,
+                                vocabulary, do_shuffle=False, is_partial=True)
+        batches_gen = gen_loader.batch_iterator(num_epochs=1, batch_size=1000)
 
     # Create the graph
     global_counter = tf.Variable(0, trainable=False)
@@ -163,6 +177,8 @@ def main(unused_argv):
 
     lstm_state = (tf.tile(lstm_zero_c, [tf.shape(input_words)[0], 1]),
                   tf.tile(lstm_zero_h, [tf.shape(input_words)[0], 1]))
+    lstm_state_g = (tf.tile(lstm_zero_c, [tf.shape(input_words)[0], 1]),
+                    tf.tile(lstm_zero_h, [tf.shape(input_words)[0], 1]))
 
     if not FLAGS.task == "C":
         out_to_logit_w = tf.get_variable(
@@ -170,7 +186,8 @@ def main(unused_argv):
             shape=[FLAGS.lstm_size, FLAGS.vocab_size],
             dtype=tf.float32,
             initializer=tf.contrib.layers.xavier_initializer())
-        out_to_logit_b = tf.get_variable("output_bias", shape=[FLAGS.vocab_size])
+        out_to_logit_b = tf.get_variable("output_bias",
+                                         shape=[FLAGS.vocab_size])
     else:
         inter_w = tf.get_variable("intermediate_weights",
                                   shape=[FLAGS.lstm_size,
@@ -185,7 +202,8 @@ def main(unused_argv):
             shape=[FLAGS.intermediate_size, FLAGS.vocab_size],
             dtype=tf.float32,
             initializer=tf.contrib.layers.xavier_initializer())
-        out_to_logit_b = tf.get_variable("output_bias", shape = [FLAGS.vocab_size])
+        out_to_logit_b = tf.get_variable("output_bias",
+                                         shape=[FLAGS.vocab_size])
 
     # initialize
     lstm_outputs = []
@@ -212,10 +230,41 @@ def main(unused_argv):
         logits = tf.matmul(tf.matmul(lstm_out_drop, inter_w) + inter_b,
                            out_to_logit_w) + out_to_logit_b
 
-
     logits_reshaped = tf.transpose(tf.reshape(logits,
                                               [FLAGS.sentence_length, -1,
                                                FLAGS.vocab_size]), [1, 0, 2])
+
+    output_pure_pred = []
+    with tf.variable_scope("generate"):
+        most_probable = 0  # dummy initialisation
+        for time_step in range(FLAGS.sentence_length):
+            if time_step > 0:
+                tf.get_variable_scope().reuse_variables()
+            has_word = tf.to_float(
+                tf.not_equal(embedded_words_bn[:, time_step, :],
+                             vocabulary.dict[vocabulary.PADDING]))
+            if time_step == 0:
+                input = embedded_words_bn[:, time_step, :]
+            else:
+                input = embedded_words_bn[:, time_step, :] * has_word + \
+                        most_probable_embedded * (1 - has_word)
+
+            lstm_out_g, lstm_state_g = lstm(input, lstm_state_g)
+            if not FLAGS.task == "C":
+                most_probable = tf.arg_max(
+                    tf.matmul(lstm_out_g, out_to_logit_w) + out_to_logit_b, 1)
+            else:
+                most_probable = tf.arg_max(
+                    tf.matmul(tf.matmul(lstm_out_g, inter_w) + inter_b,
+                              out_to_logit_w) + out_to_logit_b, 1)
+            most_probable_embedded = tf.nn.embedding_lookup(embedding_matrix,
+                                                            most_probable)
+            output_pure_pred.append(most_probable)
+
+    output_g_pure = tf.to_int32(tf.stack(values=output_pure_pred, axis=1))
+    is_padding = tf.to_int32(
+        tf.equal(input_words, vocabulary.dict[vocabulary.PADDING]))
+    output_g = input_words * (1 - is_padding) + output_g_pure * is_padding
 
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
         labels=input_words[:, 1:],
@@ -287,68 +336,90 @@ def main(unused_argv):
     merged_summaries = tf.summary.merge_all()
 
     # loop over training batches
-    with tf.Session() as sess:
-        # Summary Filewriter
-        train_summary_dir = os.path.join(FLAGS.model_dir, "summary", "train")
-        train_summary_writer = tf.summary.FileWriter(train_summary_dir,
-                                                     sess.graph)
+    if FLAGS.do_train:
+        with tf.Session() as sess:
+            # Summary Filewriter
+            train_summary_dir = os.path.join(FLAGS.model_dir, "summary",
+                                             "train")
+            train_summary_writer = tf.summary.FileWriter(train_summary_dir,
+                                                         sess.graph)
 
-        # Restoring or initialising session
-        if not FLAGS.force_init:
-            try:
-                saver.restore(sess,
-                              tf.train.latest_checkpoint(FLAGS.model_dir))
-                print("Recovered Session")
-            except:  # TODO find name for this exception (it does not accept the NotFoundError displayed if it does not find the save)
+            # Restoring or initialising session
+            if not FLAGS.force_init:
+                try:
+                    saver.restore(sess,
+                                  tf.train.latest_checkpoint(FLAGS.model_dir))
+                    print("Recovered Session")
+                except:  # TODO find name for this exception (it does not accept the NotFoundError displayed if it does not find the save)
+                    sess.run(init_op)
+                    print("Unexpectedly initialised session")
+            else:
                 sess.run(init_op)
-                print("Unexpectedly initialised session")
-        else:
-            sess.run(init_op)
-            print("Initialised session")
+                print("Initialised session")
 
-        print("Start training")
-        for data_train in batches_train:
-            ms_, gc_, pp_, last_out_, last_prob_, _, \
-            word, max_p, pred, perp_of_true = \
-                sess.run([merged_summaries, global_counter, perplexity,
-                          last_output, last_prob, train_op,
-                          any_word, any_word_max_prob, any_word_prediction,
-                          any_word_real_perp],
-                         feed_dict={input_words: data_train,
-                                    is_training: True})
+            print("Start training")
+            for data_train in batches_train:
+                ms_, gc_, pp_, last_out_, last_prob_, _, \
+                word, max_p, pred, perp_of_true = \
+                    sess.run([merged_summaries, global_counter, perplexity,
+                              last_output, last_prob, train_op,
+                              any_word, any_word_max_prob, any_word_prediction,
+                              any_word_real_perp],
+                             feed_dict={input_words: data_train,
+                                        is_training: True})
 
-            if gc_ > FLAGS.no_output_before_n:
-                train_summary_writer.add_summary(ms_, gc_)
+                if gc_ > FLAGS.no_output_before_n:
+                    train_summary_writer.add_summary(ms_, gc_)
 
-            if (gc_ % FLAGS.evaluate_every) == 0 or gc_ == 1:
-                print("Iteration %s: Perplexity is %s" % (gc_, pp_))
+                if (gc_ % FLAGS.evaluate_every) == 0 or gc_ == 1:
+                    print("Iteration %s: Perplexity is %s" % (gc_, pp_))
 
-            if (gc_ % FLAGS.checkpoint_every == 0) and gc_ > 0:
-                ckpt_path = saver.save(sess, os.path.join(FLAGS.model_dir,
-                                                          'model'), gc_)
-                print("Model saved in file: %s" % ckpt_path)
-            if gc_ % FLAGS.hlave_lr_every == 0 & gc_ > 0:
-                eff_rate /= 2
+                if (gc_ % FLAGS.checkpoint_every == 0) and gc_ > 0:
+                    ckpt_path = saver.save(sess, os.path.join(FLAGS.model_dir,
+                                                              'model'), gc_)
+                    print("Model saved in file: %s" % ckpt_path)
+                if gc_ % FLAGS.hlave_lr_every == 0 & gc_ > 0:
+                    eff_rate /= 2
 
-            if gc_ % 50 == 0:
-                print(
-                    "Target: %s, Perplexity of target: %s,  "
-                    "max prob: %s, predicted: %s" % (word, perp_of_true,
-                                                     max_p, pred))
+                if gc_ % 50 == 0:
+                    print(
+                        "Target: %s, Perplexity of target: %s,  "
+                        "max prob: %s, predicted: %s" % (word, perp_of_true,
+                                                         max_p, pred))
 
-        print("Start validation")
-        out_pp = np.empty(0)
-        for data_eval in batches_eval:
-            out_pp = np.concatenate((out_pp, sess.run(sentence_perplexity,
-                                                      feed_dict={
-                                                          input_words: data_eval,
-                                                          is_training: False})))
-        np.savetxt(
-            FLAGS.output_dir + "/group25.perplexity" + FLAGS.task,
-            np.array(out_pp),
-            fmt="%4.8f",
-            delimiter=',')
+    if FLAGS.do_eval:
+        with tf.Session() as sess:
+            # Restoring or initialising session
+            saver.restore(sess,
+                          tf.train.latest_checkpoint(FLAGS.model_dir))
+            print("Recovered Session")
+            out_pp = np.empty(0)
+            for data_eval in batches_eval:
+                out_pp = np.concatenate((out_pp, sess.run(sentence_perplexity,
+                                                          feed_dict={
+                                                              input_words: data_eval,
+                                                              is_training: False})))
+            np.savetxt(
+                FLAGS.output_dir + "/group25.perplexity" + FLAGS.task,
+                np.array(out_pp),
+                fmt="%4.8f",
+                delimiter=',')
 
+    if FLAGS.do_generate:
+        with tf.Session() as sess:
+            # Restoring or initialising session
+            saver.restore(sess,
+                          tf.train.latest_checkpoint(FLAGS.model_dir))
+            print("Recovered Session")
+            sentences = []
+            for data_gen in batches_gen:
+                out = sess.run(output_g, feed_dict={input_words: data_gen,
+                                                    is_training: False})
+                sentences.append(out)
+
+        translator = vocabulary.get_inverse_voc_dict()
+        out_sentences = np.array([translator[x] for x in sentences.reshape([-1])]).reshape([-1, FLAGS.sentence_length])
+        print(out_sentences)
 
 if __name__ == '__main__':
     tf.app.run()
