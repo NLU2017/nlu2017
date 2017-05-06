@@ -13,7 +13,7 @@ tf.flags.DEFINE_float("dev_sample_percentage", .1,
                       "Percentage of the training data used for validation (default: 10%)")
 tf.flags.DEFINE_string("train_file_path", "../data/sentences.train",
                        "Path to the training data")
-tf.flags.DEFINE_string("eval_file_path", "../data/sentences.eval",
+tf.flags.DEFINE_string("eval_file_path", "../data/sentences_test",
                        "Path to the validation data")
 tf.flags.DEFINE_string("generate_file_path", "../data/sentences.continuation",
                        "Source file for incomplete sentences")
@@ -25,7 +25,7 @@ tf.flags.DEFINE_string("output_dir", "../data",
 tf.flags.DEFINE_string("embedding", "../data/wordembeddings-dim100.word2vec",
                        "Path to the embedding file (space separated)")
 tf.flags.DEFINE_boolean("do_train", True, "Perform training")
-tf.flags.DEFINE_boolean("do_eval", False, "Perform evaluation")
+tf.flags.DEFINE_boolean("do_eval", True, "Perform evaluation")
 tf.flags.DEFINE_boolean("do_generate", True, "Perform generation")
 
 # Model parameters
@@ -50,7 +50,7 @@ tf.flags.DEFINE_string("log_dir", "../runs/",
                        "Output directory (default: '../runs/')")
 tf.flags.DEFINE_float("learning_rate", 0.01,
                       "Inital learning rate of the optimizer")
-tf.flags.DEFINE_integer("hlave_lr_every", 60000,
+tf.flags.DEFINE_integer("hlave_lr_every", 30000,
                         "Every n steps the learning rate is halved")
 tf.flags.DEFINE_float("dropout_rate", 0.0,
                       "Dropout probs. (0.0 for no dropout)")
@@ -58,7 +58,7 @@ tf.flags.DEFINE_integer("no_output_before_n", 500,
                         "Supress the first outputs, because of strong changes")
 tf.flags.DEFINE_boolean("allow_batchnorm", False,
                         "Allow or disallow batch normalisation")
-tf.flags.DEFINE_float("lambda_l2", 0.000000001, "Strength of L2 normalization")
+tf.flags.DEFINE_float("lambda_l2", 0.00000000001, "Strength of L2 normalization")
 
 # Tensorflow Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True,
@@ -143,20 +143,11 @@ def main(unused_argv):
                                       high=0.25,
                                       size=FLAGS.embedding_size)
         embedding_matrix = tf.Variable(external_embedding, dtype=tf.float32)
-    is_training = tf.placeholder(tf.bool)
-    tf.add_to_collection("is_training", is_training)
     input_words = tf.placeholder(tf.int32, [None, FLAGS.sentence_length])
     # add to collection for usage from restored model
     tf.add_to_collection("input_words", input_words)
 
     embedded_words = tf.nn.embedding_lookup(embedding_matrix, input_words)
-
-    embedded_words_bn = \
-        tf.layers.batch_normalization(embedded_words,
-                                      training=is_training,
-                                      center=FLAGS.allow_batchnorm,
-                                      scale=FLAGS.allow_batchnorm)
-    tf.add_to_collection("embedded_words", embedded_words_bn)
 
     # RNN graph
     lstm = tf.contrib.rnn.BasicLSTMCell(FLAGS.lstm_size)
@@ -215,67 +206,32 @@ def main(unused_argv):
         for time_step in range(FLAGS.sentence_length):
             if time_step > 0:
                 tf.get_variable_scope().reuse_variables()
-            lstm_out, lstm_state = lstm(embedded_words_bn[:, time_step, :],
+            lstm_out, lstm_state = lstm(embedded_words[:, time_step, :],
                                         lstm_state)
 
             lstm_outputs.append(lstm_out)
 
     output = tf.concat(axis=0, values=lstm_outputs)
 
-    lstm_out_drop = tf.layers.dropout(output,
-                                      rate=FLAGS.dropout_rate,
-                                      training=is_training)
-
     if not FLAGS.task == "C":
-        logits = tf.matmul(lstm_out_drop, out_to_logit_w) + out_to_logit_b
+        logits = tf.matmul(output, out_to_logit_w) + out_to_logit_b
+        l2_loss = tf.nn.l2_loss(out_to_logit_w) * FLAGS.lambda_l2
     else:
-        logits = tf.matmul(tf.matmul(lstm_out_drop, inter_w) + inter_b,
+        logits = tf.matmul(tf.matmul(output, inter_w) + inter_b,
                            out_to_logit_w) + out_to_logit_b
+        l2_loss = (tf.nn.l2_loss(out_to_logit_w) + tf.nn.l2_loss(
+            inter_w)) * FLAGS.lambda_l2
 
     logits_reshaped = tf.transpose(tf.reshape(logits,
                                               [FLAGS.sentence_length, -1,
                                                FLAGS.vocab_size]), [1, 0, 2])
     best_pred = tf.arg_max(logits_reshaped, 2)
 
-    output_pure_pred = []
-    with tf.variable_scope("generate"):
-        most_probable = 0  # dummy initialisation
-        for time_step in range(FLAGS.sentence_length):
-            if time_step > 0:
-                tf.get_variable_scope().reuse_variables()
-            has_word = tf.to_float(
-                tf.not_equal(embedded_words_bn[:, time_step, :],
-                             vocabulary.dict[vocabulary.PADDING]))
-            if time_step == 0:
-                input = embedded_words_bn[:, time_step, :]
-            else:
-                input = embedded_words_bn[:, time_step, :] * has_word + \
-                        most_probable_embedded * (1 - has_word)
-
-            lstm_out_g, lstm_state_g = lstm(input, lstm_state_g)
-            if not FLAGS.task == "C":
-                most_probable = tf.arg_max(
-                    tf.matmul(lstm_out_g, out_to_logit_w) + out_to_logit_b, 1)
-                l2_loss = tf.nn.l2_loss(out_to_logit_w) * FLAGS.lambda_l2
-            else:
-                most_probable = tf.arg_max(
-                    tf.matmul(tf.matmul(lstm_out_g, inter_w) + inter_b,
-                              out_to_logit_w) + out_to_logit_b, 1)
-                l2_loss = (tf.nn.l2_loss(out_to_logit_w) + tf.nn.l2_loss(inter_w)) * FLAGS.lambda_l2
-            most_probable_embedded = tf.nn.embedding_lookup(embedding_matrix,
-                                                            most_probable)
-            output_pure_pred.append(most_probable)
-
-    output_g_pure = tf.to_int32(tf.stack(values=output_pure_pred, axis=1))
-    is_padding = tf.to_int32(
-        tf.equal(input_words, vocabulary.dict[vocabulary.PADDING]))
-    output_g = input_words * (1 - is_padding) + output_g_pure * is_padding
-
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
         labels=input_words[:, 1:],
         logits=logits_reshaped[:, :-1, :]) / np.log(2) * \
            tf.to_float(tf.not_equal(input_words[:, 1:],
-                                    vocabulary.dict[vocabulary.PADDING])) + l2_loss
+                                    vocabulary.dict[vocabulary.PADDING]))
 
     # Sanity check
     any_word = input_words[10, 5]
@@ -302,24 +258,27 @@ def main(unused_argv):
     # TODO Confirm that the elementwise crossentropy is -p(w_t|w_1,...,w_{t-1})
     mean_loss = tf.reduce_sum(loss) / tf.reduce_sum(
         tf.to_float(tf.not_equal(input_words[:, 1:],
-                                 vocabulary.dict[vocabulary.PADDING])))
+                                 vocabulary.dict[vocabulary.PADDING]))) + l2_loss
     tf.summary.scalar('loss', mean_loss)
     perplexity = tf.pow(2.0, mean_loss)
     tf.add_to_collection("perplexity", perplexity)
     tf.summary.scalar('perplexity', perplexity)
 
+    nominator = tf.reduce_sum(loss, axis=1)
+    denominator =  tf.reduce_sum(tf.to_float(
+            tf.not_equal(input_words[:, 1:],
+                         vocabulary.dict[vocabulary.PADDING])), axis=1)
+
     sentence_perplexity = \
         tf.pow(2.0, tf.reduce_sum(loss, axis=1) / tf.reduce_sum(tf.to_float(
             tf.not_equal(input_words[:, 1:],
-                         vocabulary.dict[vocabulary.PADDING])), axis=1)) if tf.reduce_sum(tf.to_float(
-            tf.not_equal(input_words[:, 1:],
-                         vocabulary.dict[vocabulary.PADDING])), axis=1) == 0 else 100000
+                         vocabulary.dict[vocabulary.PADDING])), axis=1))
     tf.summary.histogram('sPerplexity', sentence_perplexity)
 
     # TODO add learning_rate to summaries
     optimiser = tf.train.AdamOptimizer(FLAGS.learning_rate)
 
-    gradients, v = zip(*optimiser.compute_gradients(loss))
+    gradients, v = zip(*optimiser.compute_gradients(mean_loss))
     # TODO from the doc it looks as if we actually wanted to set use_norm to 10 instead. Confirm!
     # https://www.tensorflow.org/api_docs/python/tf/clip_by_global_norm
     clipped_gradients, _ = tf.clip_by_global_norm(gradients, 10)
@@ -370,15 +329,19 @@ def main(unused_argv):
 
             print("Start training")
             for data_train in batches_train:
-                ms_, gc_, pp_, last_out_, last_prob_, _, \
-                word, max_p, pred, perp_of_true, word2, word_pre = \
-                    sess.run([merged_summaries, global_counter, perplexity,
-                              last_output, last_prob, train_op,
-                              any_word, any_word_max_prob, any_word_prediction,
-                              any_word_real_perp, any_word_prediction2,
-                              any_word_pre],
-                             feed_dict={input_words: data_train,
-                                        is_training: True})
+                gc_ = 0
+                if (gc_ % FLAGS.evaluate_every) == 0 or gc_ == 1:
+                    ms_, gc_, pp_, last_out_, last_prob_, _, \
+                    word, max_p, pred, perp_of_true, word2, word_pre = \
+                        sess.run([merged_summaries, global_counter, perplexity,
+                                  last_output, last_prob, train_op,
+                                  any_word, any_word_max_prob, any_word_prediction,
+                                  any_word_real_perp, any_word_prediction2,
+                                  any_word_pre],
+                                 feed_dict={input_words: data_train})
+                else:
+                    _, gc_ = sess.run([train_op, global_counter],
+                             feed_dict={input_words: data_train})
 
                 if gc_ > FLAGS.no_output_before_n:
                     train_summary_writer.add_summary(ms_, gc_)
@@ -411,8 +374,7 @@ def main(unused_argv):
             for data_eval in batches_eval:
                 out_pp = np.concatenate((out_pp, sess.run(sentence_perplexity,
                                                           feed_dict={
-                                                              input_words: data_eval,
-                                                              is_training: False})))
+                                                              input_words: data_eval})))
             np.savetxt(
                 FLAGS.output_dir + "/group25.perplexity" + FLAGS.task,
                 np.array(out_pp),
@@ -429,8 +391,7 @@ def main(unused_argv):
             for data_gen in batches_gen:
                 input = data_gen
                 for t in range(FLAGS.sentence_length - 1):
-                    best = sess.run(best_pred, feed_dict={input_words: input,
-                                                          is_training: False})
+                    best = sess.run(best_pred, feed_dict={input_words: input})
 
                     if t < (FLAGS.sentence_length - 1):
                         next_available = data_gen[:, t+1] != vocabulary.dict[vocabulary.PADDING]
@@ -438,18 +399,16 @@ def main(unused_argv):
                                           (1-next_available) * best[:, t]
 
                 sentences.append(input)
-                if len(sentences) > 1:
-                    break
 
         translator = vocabulary.get_inverse_voc_dict()
         sentence_together = np.vstack(sentences)
         out_sentences = np.array([translator[x] for x in sentence_together.reshape([-1])]).reshape([-1, FLAGS.sentence_length])
 
-        print(out_sentences)
         np.savetxt(
             FLAGS.output_dir + "/group25.generated" + FLAGS.task,
             np.array(out_sentences),
-            delimiter=',')
+            fmt="%s",
+            delimiter=' ')
 
 if __name__ == '__main__':
     tf.app.run()
