@@ -404,11 +404,11 @@ def main(unused_argv):
         sentence_together = np.vstack(sentences)
         out_sentences = np.array([translator[x] for x in sentence_together.reshape([-1])]).reshape([-1, FLAGS.sentence_length])
 
-        clean_and_cut_sentences(out_sentences)
+        tt = clean_and_cut_sentences(out_sentences)
 
         np.savetxt(
             FLAGS.output_dir + "/group25.generated" + FLAGS.task,
-            np.array(sentences),
+            np.array(tt),
             fmt="%s",
             delimiter='\n')
 
