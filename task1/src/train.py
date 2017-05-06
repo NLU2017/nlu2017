@@ -23,7 +23,7 @@ tf.flags.DEFINE_string("output_dir", "../data",
                        "Directory to store the results")
 tf.flags.DEFINE_string("embedding", "../data/wordembeddings-dim100.word2vec",
                        "Path to the embedding file (space separated)")
-tf.flags.DEFINE_boolean("do_train", False, "Perform training")
+tf.flags.DEFINE_boolean("do_train", True, "Perform training")
 tf.flags.DEFINE_boolean("do_eval", False, "Perform evaluation")
 tf.flags.DEFINE_boolean("do_generate", True, "Perform generation")
 
@@ -37,7 +37,7 @@ tf.flags.DEFINE_string("model_name", "A_Vanilla", "Name the model")
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
-tf.flags.DEFINE_integer("num_epochs", 1,
+tf.flags.DEFINE_integer("num_epochs", 5,
                         "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("evaluate_every", 50,
                         "Evaluate model on dev set after this many steps (default: 100)")
@@ -47,15 +47,15 @@ tf.flags.DEFINE_integer("num_checkpoints", 3,
                         "Number of checkpoints to store (default: 5)")
 tf.flags.DEFINE_string("log_dir", "../runs/",
                        "Output directory (default: '../runs/')")
-tf.flags.DEFINE_float("learning_rate", 5e-3,
+tf.flags.DEFINE_float("learning_rate", 0.01,
                       "Inital learning rate of the optimizer")
-tf.flags.DEFINE_integer("hlave_lr_every", 10000,
+tf.flags.DEFINE_integer("hlave_lr_every", 60000,
                         "Every n steps the learning rate is halved")
 tf.flags.DEFINE_float("dropout_rate", 0.0,
                       "Dropout probs. (0.0 for no dropout)")
 tf.flags.DEFINE_integer("no_output_before_n", 500,
                         "Supress the first outputs, because of strong changes")
-tf.flags.DEFINE_boolean("allow_batchnorm", True,
+tf.flags.DEFINE_boolean("allow_batchnorm", False,
                         "Allow or disallow batch normalisation")
 
 # Tensorflow Parameters
@@ -274,10 +274,14 @@ def main(unused_argv):
 
     # Sanity check
     any_word = input_words[10, 5]
+    any_word_pre = input_words[10, 4]
     any_word_probs = tf.nn.softmax(logits_reshaped[10, 5, :])
     any_word_max_prob = tf.reduce_max(any_word_probs)
     any_word_prediction = tf.argmax(any_word_probs, dimension=0)
     any_word_real_perp = 1 / any_word_probs[any_word]
+
+    any_word_probs2 = tf.nn.softmax(logits_reshaped[11, 6, :])
+    any_word_prediction2 = tf.argmax(any_word_probs2, dimension=0)
 
     # output of the last layer in the unrolled LSTM
     last_output = lstm_outputs[-1]
@@ -302,7 +306,9 @@ def main(unused_argv):
     sentence_perplexity = \
         tf.pow(2.0, tf.reduce_sum(loss, axis=1) / tf.reduce_sum(tf.to_float(
             tf.not_equal(input_words[:, 1:],
-                         vocabulary.dict[vocabulary.PADDING])), axis=1))
+                         vocabulary.dict[vocabulary.PADDING])), axis=1)) if tf.reduce_sum(tf.to_float(
+            tf.not_equal(input_words[:, 1:],
+                         vocabulary.dict[vocabulary.PADDING])), axis=1) == 0 else 100000
     tf.summary.histogram('sPerplexity', sentence_perplexity)
 
     # TODO add learning_rate to summaries
@@ -360,11 +366,12 @@ def main(unused_argv):
             print("Start training")
             for data_train in batches_train:
                 ms_, gc_, pp_, last_out_, last_prob_, _, \
-                word, max_p, pred, perp_of_true = \
+                word, max_p, pred, perp_of_true, word2, word_pre = \
                     sess.run([merged_summaries, global_counter, perplexity,
                               last_output, last_prob, train_op,
                               any_word, any_word_max_prob, any_word_prediction,
-                              any_word_real_perp],
+                              any_word_real_perp, any_word_prediction2,
+                              any_word_pre],
                              feed_dict={input_words: data_train,
                                         is_training: True})
 
@@ -384,8 +391,10 @@ def main(unused_argv):
                 if gc_ % 50 == 0:
                     print(
                         "Target: %s, Perplexity of target: %s,  "
-                        "max prob: %s, predicted: %s" % (word, perp_of_true,
-                                                         max_p, pred))
+                        "max prob: %s, predicted: %s, second_word: %s,"
+                        "Previous word: %s" % (word, perp_of_true,
+                                                         max_p, pred, word2,
+                                               word_pre))
 
     if FLAGS.do_eval:
         with tf.Session() as sess:
@@ -416,10 +425,17 @@ def main(unused_argv):
                 out = sess.run(output_g, feed_dict={input_words: data_gen,
                                                     is_training: False})
                 sentences.append(out)
+                break
 
         translator = vocabulary.get_inverse_voc_dict()
-        out_sentences = np.array([translator[x] for x in sentences.reshape([-1])]).reshape([-1, FLAGS.sentence_length])
+        sentence_together = np.vstack(sentences)
+        out_sentences = np.array([translator[x] for x in sentence_together.reshape([-1])]).reshape([-1, FLAGS.sentence_length])
+
         print(out_sentences)
+        np.savetxt(
+            FLAGS.output_dir + "/group25.generated" + FLAGS.task,
+            np.array(out_sentences),
+            delimiter=',')
 
 if __name__ == '__main__':
     tf.app.run()
