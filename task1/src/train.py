@@ -1,3 +1,4 @@
+import pickle
 import time
 import os
 import tensorflow as tf
@@ -57,13 +58,14 @@ tf.flags.DEFINE_integer("no_output_before_n", 500,
                         "Supress the first outputs, because of strong changes")
 tf.flags.DEFINE_boolean("allow_batchnorm", False,
                         "Allow or disallow batch normalisation")
+tf.flags.DEFINE_float("lambda_l2", 0.000000001, "Strength of L2 normalization")
 
 # Tensorflow Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True,
                         "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", False,
                         "Log placement of ops on devices")
-tf.flags.DEFINE_boolean("force_init", True,
+tf.flags.DEFINE_boolean("force_init", False,
                         "Whether to always start training from scratch")
 
 FLAGS = tf.flags.FLAGS
@@ -85,8 +87,8 @@ def main(unused_argv):
     eff_rate = FLAGS.learning_rate
 
     # extract the vocabulary from training sentendes
-    vocabulary = Vocabulary()
-    vocabulary.load_file(FLAGS.train_file_path)
+    with open("vocabulary.pickle", "rb") as f:
+        vocabulary = pickle.load(f)
 
     # load training data
     if FLAGS.do_train:
@@ -233,6 +235,7 @@ def main(unused_argv):
     logits_reshaped = tf.transpose(tf.reshape(logits,
                                               [FLAGS.sentence_length, -1,
                                                FLAGS.vocab_size]), [1, 0, 2])
+    best_pred = tf.arg_max(logits_reshaped, 2)
 
     output_pure_pred = []
     with tf.variable_scope("generate"):
@@ -253,10 +256,12 @@ def main(unused_argv):
             if not FLAGS.task == "C":
                 most_probable = tf.arg_max(
                     tf.matmul(lstm_out_g, out_to_logit_w) + out_to_logit_b, 1)
+                l2_loss = tf.nn.l2_loss(out_to_logit_w) * FLAGS.lambda_l2
             else:
                 most_probable = tf.arg_max(
                     tf.matmul(tf.matmul(lstm_out_g, inter_w) + inter_b,
                               out_to_logit_w) + out_to_logit_b, 1)
+                l2_loss = (tf.nn.l2_loss(out_to_logit_w) + tf.nn.l2_loss(inter_w)) * FLAGS.lambda_l2
             most_probable_embedded = tf.nn.embedding_lookup(embedding_matrix,
                                                             most_probable)
             output_pure_pred.append(most_probable)
@@ -270,7 +275,7 @@ def main(unused_argv):
         labels=input_words[:, 1:],
         logits=logits_reshaped[:, :-1, :]) / np.log(2) * \
            tf.to_float(tf.not_equal(input_words[:, 1:],
-                                    vocabulary.dict[vocabulary.PADDING]))
+                                    vocabulary.dict[vocabulary.PADDING])) + l2_loss
 
     # Sanity check
     any_word = input_words[10, 5]
@@ -388,7 +393,7 @@ def main(unused_argv):
                 if gc_ % FLAGS.hlave_lr_every == 0 & gc_ > 0:
                     eff_rate /= 2
 
-                if gc_ % 50 == 0:
+                if gc_ % 250 == 0:
                     print(
                         "Target: %s, Perplexity of target: %s,  "
                         "max prob: %s, predicted: %s, second_word: %s,"
@@ -422,10 +427,19 @@ def main(unused_argv):
             print("Recovered Session")
             sentences = []
             for data_gen in batches_gen:
-                out = sess.run(output_g, feed_dict={input_words: data_gen,
-                                                    is_training: False})
-                sentences.append(out)
-                break
+                input = data_gen
+                for t in range(FLAGS.sentence_length - 1):
+                    best = sess.run(best_pred, feed_dict={input_words: input,
+                                                          is_training: False})
+
+                    if t < (FLAGS.sentence_length - 1):
+                        next_available = data_gen[:, t+1] != vocabulary.dict[vocabulary.PADDING]
+                        input[:, t + 1] = next_available * data_gen[:, t+1] + \
+                                          (1-next_available) * best[:, t]
+
+                sentences.append(input)
+                if len(sentences) > 1:
+                    break
 
         translator = vocabulary.get_inverse_voc_dict()
         sentence_together = np.vstack(sentences)
