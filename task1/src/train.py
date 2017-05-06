@@ -9,8 +9,7 @@ import pickle as pickle
 ## PARAMETERS ##
 
 # Data loading parameters
-tf.flags.DEFINE_float("dev_sample_percentage", .1,
-                      "Percentage of the training data used for validation (default: 10%)")
+tf.flags.DEFINE_float("dev_sample_percentage", .1, "Percentage of the training data used for validation (default: 10%)")
 tf.flags.DEFINE_string("train_file_path", "../data/sentences.train",
                        "Path to the training data")
 tf.flags.DEFINE_string("cont_path", "../data/sentences.continuation_short", "path to sentence continuation file")
@@ -30,7 +29,7 @@ tf.flags.DEFINE_string("task", "C", "Task to be solved")
 tf.flags.DEFINE_integer("intermediate_size", 512,
                         "Dimension of down-projection in task C")
 tf.flags.DEFINE_string("model_name", str(int(time.time())), "Name the model")
-tf.flags.DEFINE_bool("is_continuation", True, "run only prediction for task 1.2" )
+tf.flags.DEFINE_bool("is_continuation", False, "run only prediction for task 1.2" )
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
@@ -48,7 +47,7 @@ tf.flags.DEFINE_float("learning_rate", 1e-2,
                       "Inital learning rate of the optimizer")
 tf.flags.DEFINE_integer("hlave_lr_every", 10000,
                         "Every n steps the learning rate is halved")
-tf.flags.DEFINE_float("dropout_rate", 0.5,
+tf.flags.DEFINE_float("dropout_rate", 0.0,
                       "Dropout probs. (0.0 for no dropout)")
 tf.flags.DEFINE_integer("no_output_before_n", 5000,
                         "Supress the first outputs, because of strong changes")
@@ -62,7 +61,7 @@ tf.flags.DEFINE_boolean("log_device_placement", False,
                         "Log placement of ops on devices")
 tf.flags.DEFINE_boolean("force_init", True,
                         "Whether to always start training from scratch")
-tf.flags.DEFINE_boolean("is_training", True, "training mode")
+tf.flags.DEFINE_boolean("is_training", False, "training mode")
 
 tf.flags.DEFINE_boolean("is_eval", False, "do evaluation")
 FLAGS = tf.flags.FLAGS
@@ -85,7 +84,7 @@ def main(unused_argv):
     eff_rate = FLAGS.learning_rate
 
     # extract the vocabulary from training sentendes
-    vocabulary = pickle.load( open( "vocabulary.pickle", "rb" ))
+    vocabulary = pickle.load( open( "./vocabulary.pickle", "rb" ))
     # load training data
     if FLAGS.is_continuation:
         cont_loader = DataLoader(FLAGS.cont_path, vocabulary, do_shuffle=False, is_partial=True)
@@ -100,7 +99,7 @@ def main(unused_argv):
 
         eval_loader = DataLoader(FLAGS.eval_file_path,
                              vocabulary, do_shuffle=False)
-        batches_eval = eval_loader.batch_iterator(num_epochs=1, batch_size=1000)
+        batches_eval = eval_loader.batch_iterator(num_epochs=1, batch_size=FLAGS.batch_size)
 
     # Create the graph
     global_counter = tf.Variable(0, trainable=False)
@@ -203,42 +202,59 @@ def main(unused_argv):
     # initialize
 
     lstm_outputs = []
-    # add summaries for tensorboard
+# add summaries for tensorboard
 
     with tf.variable_scope("RNN"):
-        loop_input = embedded_words_bn[:, 0, :]
-        sentences = [input_words[:,0]]
-        for time_step in range(FLAGS.sentence_length-1):
+
+
+        sentences = []
+        best_match = [input_words[:,0]]
+        for time_step in range(FLAGS.sentence_length):
 
             if time_step > 0:
                 tf.get_variable_scope().reuse_variables()
 
-            lstm_out, lstm_state = lstm(loop_input, lstm_state)
+            if FLAGS.is_continuation:
 
-            if(FLAGS.is_continuation):
+                has_word_in_sequence = tf.to_int32(tf.not_equal(input_words[:, time_step], vocabulary.dict[vocabulary.PADDING]))
+                is_padding = tf.to_int32(tf.equal(input_words[:, time_step], vocabulary.dict[vocabulary.PADDING]))
+
+                # add the next word of the input sentence for the next run or the best_fit from the model if the sentence input is exhausted
+                # if the sentence input is exhausted
+                next_words = best_match * is_padding + input_words[:, time_step] * has_word_in_sequence
+                sentences.append(next_words[0])
+                loop_input = tf.nn.embedding_lookup(embedding_matrix, next_words[0])
+            else:
+                loop_input = embedded_words_bn[:, time_step, :]
+                sentences.append(input_words[:, time_step])
+
+            lstm_out, lstm_state = lstm(loop_input, lstm_state)
+            lstm_outputs.append(lstm_out)
+
+            if FLAGS.is_continuation:
 
                 logits_p = tf.matmul(tf.matmul(lstm_out, inter_w) + inter_b,
                                      out_to_logit_w) + out_to_logit_b
                 #logits_p = tf.matmul(lstm_out, out_to_logit_w) + out_to_logit_b
                 best_match = tf.cast(tf.arg_max(logits_p, dimension=1), tf.int32)
 
-                has_word_in_sequence =tf.to_int32(tf.not_equal(input_words[:,time_step +1], vocabulary.dict[vocabulary.PADDING]))
-                is_padding =tf.to_int32( tf.equal(input_words[:,time_step +1], vocabulary.dict[vocabulary.PADDING]))
-
-                # add the next word of the input sentence for the next run or the best_fit from the model if the sentence input is exhausted
-                # if the sentence input is exhausted
-
-                next_words = best_match * is_padding + input_words[:, time_step + 1] * has_word_in_sequence
-
-
-                loop_input = tf.nn.embedding_lookup(embedding_matrix, next_words)
+                # has_word_in_sequence =tf.to_int32(tf.not_equal(input_words[:,time_step +1], vocabulary.dict[vocabulary.PADDING]))
+                # is_padding =tf.to_int32( tf.equal(input_words[:,time_step +1], vocabulary.dict[vocabulary.PADDING]))
+                #
+                # # add the next word of the input sentence for the next run or the best_fit from the model if the sentence input is exhausted
+                # # if the sentence input is exhausted
+                #
+                # next_words = best_match * is_padding + input_words[:, time_step + 1] * has_word_in_sequence
+                #
+                #
+                # loop_input = tf.nn.embedding_lookup(embedding_matrix, next_words)
 
                 sentences.append(next_words)
-            else:
-                loop_input = embedded_words_bn[:, time_step + 1, :]
-                sentences.append(input_words[:, time_step + 1])
+            # else:
+            #     loop_input = embedded_words_bn[:, time_step + 1, :]
+            #     sentences.append(input_words[:, time_step + 1])
 
-            lstm_outputs.append(lstm_out)
+
 
     output = tf.concat(axis=0, values=lstm_outputs)
 
