@@ -4,6 +4,7 @@ import tensorflow as tf
 from utils import Vocabulary, DataLoader
 import numpy as np
 import csv
+import pickle as pickle
 
 ## PARAMETERS ##
 
@@ -12,45 +13,46 @@ tf.flags.DEFINE_float("dev_sample_percentage", .1,
                       "Percentage of the training data used for validation (default: 10%)")
 tf.flags.DEFINE_string("train_file_path", "../data/sentences.train",
                        "Path to the training data")
+tf.flags.DEFINE_string("cont_path", "../data/sentences.continuation_short", "path to sentence continuation file")
 tf.flags.DEFINE_string("eval_file_path", "../data/sentences.eval",
                        "Path to the validation data")
 tf.flags.DEFINE_integer("sentence_length", 30, "Length of the input sentences")
 tf.flags.DEFINE_integer("vocab_size", 20000,
                         "Number of words in the vocabulary")
-tf.flags.DEFINE_string("output_dir", "../data",
-                       "Directory to store the results")
+
 tf.flags.DEFINE_string("embedding", "../data/wordembeddings-dim100.word2vec",
                        "Path to the embedding file (space separated)")
 
 # Model parameters
 tf.flags.DEFINE_integer("lstm_size", 512, "Length of the hidden state")
 tf.flags.DEFINE_integer("embedding_size", 100, "Dimension of the embedding")
-tf.flags.DEFINE_string("task", "A", "Task to be solved")
+tf.flags.DEFINE_string("task", "C", "Task to be solved")
 tf.flags.DEFINE_integer("intermediate_size", 512,
                         "Dimension of down-projection in task C")
 tf.flags.DEFINE_string("model_name", str(int(time.time())), "Name the model")
+tf.flags.DEFINE_bool("is_continuation", True, "run only prediction for task 1.2" )
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
-tf.flags.DEFINE_integer("num_epochs", 1,
+tf.flags.DEFINE_integer("num_epochs", 5,
                         "Number of training epochs (default: 200)")
 tf.flags.DEFINE_integer("evaluate_every", 50,
                         "Evaluate model on dev set after this many steps (default: 100)")
-tf.flags.DEFINE_integer("checkpoint_every", 1000,
+tf.flags.DEFINE_integer("checkpoint_every", 100,
                         "Save model after this many steps (default: 100)")
 tf.flags.DEFINE_integer("num_checkpoints", 3,
                         "Number of checkpoints to store (default: 5)")
 tf.flags.DEFINE_string("log_dir", "../runs/",
                        "Output directory (default: '../runs/')")
-tf.flags.DEFINE_float("learning_rate", 5e-3,
+tf.flags.DEFINE_float("learning_rate", 1e-2,
                       "Inital learning rate of the optimizer")
 tf.flags.DEFINE_integer("hlave_lr_every", 10000,
                         "Every n steps the learning rate is halved")
-tf.flags.DEFINE_float("dropout_rate", 0.0,
+tf.flags.DEFINE_float("dropout_rate", 0.5,
                       "Dropout probs. (0.0 for no dropout)")
-tf.flags.DEFINE_integer("no_output_before_n", 500,
+tf.flags.DEFINE_integer("no_output_before_n", 5000,
                         "Supress the first outputs, because of strong changes")
-tf.flags.DEFINE_boolean("allow_batchnorm", True,
+tf.flags.DEFINE_boolean("allow_batchnorm", False,
                         "Allow or disallow batch normalisation")
 
 # Tensorflow Parameters
@@ -60,8 +62,11 @@ tf.flags.DEFINE_boolean("log_device_placement", False,
                         "Log placement of ops on devices")
 tf.flags.DEFINE_boolean("force_init", True,
                         "Whether to always start training from scratch")
+tf.flags.DEFINE_boolean("is_training", True, "training mode")
 
+tf.flags.DEFINE_boolean("is_eval", False, "do evaluation")
 FLAGS = tf.flags.FLAGS
+
 FLAGS._parse_flags()
 print("\nCommand-line Arguments:")
 for attr, value in sorted(FLAGS.__flags.items()):
@@ -80,19 +85,22 @@ def main(unused_argv):
     eff_rate = FLAGS.learning_rate
 
     # extract the vocabulary from training sentendes
-    vocabulary = Vocabulary()
-    vocabulary.load_file(FLAGS.train_file_path)
-
+    vocabulary = pickle.load( open( "vocabulary.pickle", "rb" ))
     # load training data
-    train_loader = DataLoader(FLAGS.train_file_path,
+    if FLAGS.is_continuation:
+        cont_loader = DataLoader(FLAGS.cont_path, vocabulary, do_shuffle=False, is_partial=True)
+        batches_cont = cont_loader.batch_iterator(1, FLAGS.batch_size)
+    if FLAGS.is_training:
+        train_loader = DataLoader(FLAGS.train_file_path,
                               vocabulary, do_shuffle=True)
-    batches_train = train_loader.batch_iterator(FLAGS.num_epochs,
+        batches_train = train_loader.batch_iterator(FLAGS.num_epochs,
                                                 FLAGS.batch_size)
+    if FLAGS.is_eval:
+        # load validation data
 
-    # load validation data
-    eval_loader = DataLoader(FLAGS.eval_file_path,
+        eval_loader = DataLoader(FLAGS.eval_file_path,
                              vocabulary, do_shuffle=False)
-    batches_eval = eval_loader.batch_iterator(num_epochs=1, batch_size=1000)
+        batches_eval = eval_loader.batch_iterator(num_epochs=1, batch_size=1000)
 
     # Create the graph
     global_counter = tf.Variable(0, trainable=False)
@@ -127,6 +135,7 @@ def main(unused_argv):
                                       high=0.25,
                                       size=FLAGS.embedding_size)
         embedding_matrix = tf.Variable(external_embedding, dtype=tf.float32)
+
     is_training = tf.placeholder(tf.bool)
     tf.add_to_collection("is_training", is_training)
     input_words = tf.placeholder(tf.int32, [None, FLAGS.sentence_length])
@@ -135,11 +144,14 @@ def main(unused_argv):
 
     embedded_words = tf.nn.embedding_lookup(embedding_matrix, input_words)
 
+
     embedded_words_bn = \
         tf.layers.batch_normalization(embedded_words,
                                       training=is_training,
                                       center=FLAGS.allow_batchnorm,
                                       scale=FLAGS.allow_batchnorm)
+
+
     tf.add_to_collection("embedded_words", embedded_words_bn)
 
     # RNN graph
@@ -171,6 +183,7 @@ def main(unused_argv):
             dtype=tf.float32,
             initializer=tf.contrib.layers.xavier_initializer())
         out_to_logit_b = tf.get_variable("output_bias", shape=[FLAGS.vocab_size])
+
     else:
         inter_w = tf.get_variable("intermediate_weights",
                                   shape=[FLAGS.lstm_size,
@@ -188,15 +201,42 @@ def main(unused_argv):
         out_to_logit_b = tf.get_variable("output_bias", shape = [FLAGS.vocab_size])
 
     # initialize
+
     lstm_outputs = []
     # add summaries for tensorboard
 
     with tf.variable_scope("RNN"):
-        for time_step in range(FLAGS.sentence_length):
+        loop_input = embedded_words_bn[:, 0, :]
+        sentences = [input_words[:,0]]
+        for time_step in range(FLAGS.sentence_length-1):
+
             if time_step > 0:
                 tf.get_variable_scope().reuse_variables()
-            lstm_out, lstm_state = lstm(embedded_words_bn[:, time_step, :],
-                                        lstm_state)
+
+            lstm_out, lstm_state = lstm(loop_input, lstm_state)
+
+            if(FLAGS.is_continuation):
+
+                logits_p = tf.matmul(tf.matmul(lstm_out, inter_w) + inter_b,
+                                     out_to_logit_w) + out_to_logit_b
+                #logits_p = tf.matmul(lstm_out, out_to_logit_w) + out_to_logit_b
+                best_match = tf.cast(tf.arg_max(logits_p, dimension=1), tf.int32)
+
+                has_word_in_sequence =tf.to_int32(tf.not_equal(input_words[:,time_step +1], vocabulary.dict[vocabulary.PADDING]))
+                is_padding =tf.to_int32( tf.equal(input_words[:,time_step +1], vocabulary.dict[vocabulary.PADDING]))
+
+                # add the next word of the input sentence for the next run or the best_fit from the model if the sentence input is exhausted
+                # if the sentence input is exhausted
+
+                next_words = best_match * is_padding + input_words[:, time_step + 1] * has_word_in_sequence
+
+
+                loop_input = tf.nn.embedding_lookup(embedding_matrix, next_words)
+
+                sentences.append(next_words)
+            else:
+                loop_input = embedded_words_bn[:, time_step + 1, :]
+                sentences.append(input_words[:, time_step + 1])
 
             lstm_outputs.append(lstm_out)
 
@@ -217,18 +257,14 @@ def main(unused_argv):
                                               [FLAGS.sentence_length, -1,
                                                FLAGS.vocab_size]), [1, 0, 2])
 
+
+
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
         labels=input_words[:, 1:],
         logits=logits_reshaped[:, :-1, :]) / np.log(2) * \
            tf.to_float(tf.not_equal(input_words[:, 1:],
                                     vocabulary.dict[vocabulary.PADDING]))
 
-    # Sanity check
-    any_word = input_words[10, 5]
-    any_word_probs = tf.nn.softmax(logits_reshaped[10, 5, :])
-    any_word_max_prob = tf.reduce_max(any_word_probs)
-    any_word_prediction = tf.argmax(any_word_probs, dimension=0)
-    any_word_real_perp = 1 / any_word_probs[any_word]
 
     # output of the last layer in the unrolled LSTM
     last_output = lstm_outputs[-1]
@@ -294,8 +330,9 @@ def main(unused_argv):
                                                      sess.graph)
 
         # Restoring or initialising session
-        if not FLAGS.force_init:
+        if not FLAGS.force_init or not FLAGS.is_continuation or not FLAGS.is_eval:
             try:
+                print(FLAGS.model_dir)
                 saver.restore(sess,
                               tf.train.latest_checkpoint(FLAGS.model_dir))
                 print("Recovered Session")
@@ -306,49 +343,57 @@ def main(unused_argv):
             sess.run(init_op)
             print("Initialised session")
 
-        print("Start training")
-        for data_train in batches_train:
-            ms_, gc_, pp_, last_out_, last_prob_, _, \
-            word, max_p, pred, perp_of_true = \
+        if FLAGS.is_training:
+            print("Start training")
+            for data_train in batches_train:
+                ms_, gc_, pp_, last_out_, last_prob_, _, = \
                 sess.run([merged_summaries, global_counter, perplexity,
-                          last_output, last_prob, train_op,
-                          any_word, any_word_max_prob, any_word_prediction,
-                          any_word_real_perp],
+                          last_output, last_prob, train_op],
                          feed_dict={input_words: data_train,
                                     is_training: True})
 
-            if gc_ > FLAGS.no_output_before_n:
-                train_summary_writer.add_summary(ms_, gc_)
+                if gc_ > FLAGS.no_output_before_n:
+                    train_summary_writer.add_summary(ms_, gc_)
 
-            if (gc_ % FLAGS.evaluate_every) == 0 or gc_ == 1:
-                print("Iteration %s: Perplexity is %s" % (gc_, pp_))
+                if (gc_ % FLAGS.evaluate_every) == 0 or gc_ == 1:
+                    print("Iteration %s: Perplexity is %s" % (gc_, pp_))
 
-            if (gc_ % FLAGS.checkpoint_every == 0) and gc_ > 0:
-                ckpt_path = saver.save(sess, os.path.join(FLAGS.model_dir,
+                if (gc_ % FLAGS.checkpoint_every == 0) and gc_ > 0:
+                    ckpt_path = saver.save(sess, os.path.join(FLAGS.model_dir,
                                                           'model'), gc_)
-                print("Model saved in file: %s" % ckpt_path)
-            if gc_ % FLAGS.hlave_lr_every == 0 & gc_ > 0:
-                eff_rate /= 2
+                    print("Model saved in file: %s" % ckpt_path)
+                if gc_ % FLAGS.hlave_lr_every == 0 & gc_ > 0:
+                    eff_rate /= 2
 
-            if gc_ % 50 == 0:
-                print(
-                    "Target: %s, Perplexity of target: %s,  "
-                    "max prob: %s, predicted: %s" % (word, perp_of_true,
-                                                     max_p, pred))
-
-        print("Start validation")
-        out_pp = np.empty(0)
-        for data_eval in batches_eval:
-            out_pp = np.concatenate((out_pp, sess.run(sentence_perplexity,
+        if FLAGS.is_eval:
+            print("Start validation")
+            out_pp = np.empty(0)
+            for data_eval in batches_eval:
+                out_pp = np.concatenate((out_pp, sess.run(sentence_perplexity,
                                                       feed_dict={
                                                           input_words: data_eval,
                                                           is_training: False})))
-        np.savetxt(
-            FLAGS.output_dir + "/group25.perplexity" + FLAGS.task,
-            np.array(out_pp),
-            fmt="%4.8f",
-            delimiter=',')
+            np.savetxt(
+                FLAGS.output_dir + "/group25.perplexity" + FLAGS.task,
+                np.array(out_pp),
+                fmt="%4.8f",
+                delimiter=',')
 
+        if FLAGS.is_continuation:
+            output_indices = []
+            for data_eval in batches_cont:
+                set = sess.run(sentences, feed_dict={input_words: data_eval, is_training:False})
+                output_indices.append(set)
+
+            sent = np.asarray(output_indices)[0]
+            sent = np.transpose(sent)
+
+            print(sent.shape)
+
+            for i in range(sent.shape[0]):
+                w = vocabulary.translate_to_sentence(sent[i])
+                print(sent[i])
+                print(w)
 
 if __name__ == '__main__':
     tf.app.run()

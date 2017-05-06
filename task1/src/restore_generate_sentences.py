@@ -34,7 +34,7 @@ def main(unused_argv):
     start_data = DataLoader(FLAGS.cont_file_path,
                               vocabulary, do_shuffle=False, is_partial=True)
 
-    #print_tensors_in_checkpoint_file(os.path.join(FLAGS.log_dir, 'model-200'), tensor_name='', all_tensors=True)
+    print_tensors_in_checkpoint_file(os.path.join(FLAGS.log_dir, 'model-200'), tensor_name='', all_tensors=True)
 
 
     with tf.Session() as sess:
