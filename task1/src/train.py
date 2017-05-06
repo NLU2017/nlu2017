@@ -407,7 +407,7 @@ def main(unused_argv):
         tt = clean_and_cut_sentences(out_sentences)
 
         np.savetxt(
-            FLAGS.output_dir + "/group25.generated" + FLAGS.task,
+            FLAGS.output_dir + "/group25.continuation" + FLAGS.task,
             np.array(tt),
             fmt="%s",
             delimiter='\n')
