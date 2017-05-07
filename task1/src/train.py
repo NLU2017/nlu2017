@@ -5,6 +5,7 @@ import tensorflow as tf
 from utils import Vocabulary, DataLoader, clean_and_cut_sentences
 import numpy as np
 import csv
+from load_embedding import load_embedding
 
 ## PARAMETERS ##
 
@@ -24,23 +25,24 @@ tf.flags.DEFINE_string("output_dir", "../data",
                        "Directory to store the results")
 tf.flags.DEFINE_string("embedding", "../data/wordembeddings-dim100.word2vec",
                        "Path to the embedding file (space separated)")
+#phases
 tf.flags.DEFINE_boolean("do_train", True, "Perform training")
 tf.flags.DEFINE_boolean("do_eval", True, "Perform evaluation")
 tf.flags.DEFINE_boolean("do_generate", True, "Perform generation")
 
 # Model parameters
 tf.flags.DEFINE_integer("lstm_size", 512, "Length of the hidden state")
-tf.flags.DEFINE_integer("embedding_size", 100, "Dimension of the embedding")
-tf.flags.DEFINE_string("task", "A", "Task to be solved")
 tf.flags.DEFINE_integer("intermediate_size", 512,
                         "Dimension of down-projection in task C")
+tf.flags.DEFINE_integer("embedding_size", 100, "Dimension of the embedding")
+tf.flags.DEFINE_string("task", "A", "Task to be solved")
 tf.flags.DEFINE_string("model_name", "A_Vanilla", "Name the model")
 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
 tf.flags.DEFINE_integer("num_epochs", 5,
                         "Number of training epochs (default: 200)")
-tf.flags.DEFINE_integer("evaluate_every", 50,
+tf.flags.DEFINE_integer("evaluate_every", 100,
                         "Evaluate model on dev set after this many steps (default: 100)")
 tf.flags.DEFINE_integer("checkpoint_every", 1000,
                         "Save model after this many steps (default: 100)")
@@ -52,19 +54,9 @@ tf.flags.DEFINE_float("learning_rate", 0.01,
                       "Inital learning rate of the optimizer")
 tf.flags.DEFINE_integer("hlave_lr_every", 30000,
                         "Every n steps the learning rate is halved")
-tf.flags.DEFINE_float("dropout_rate", 0.0,
-                      "Dropout probs. (0.0 for no dropout)")
 tf.flags.DEFINE_integer("no_output_before_n", 500,
                         "Supress the first outputs, because of strong changes")
-tf.flags.DEFINE_boolean("allow_batchnorm", False,
-                        "Allow or disallow batch normalisation")
 tf.flags.DEFINE_float("lambda_l2", 0.00000000001, "Strength of L2 normalization")
-
-# Tensorflow Parameters
-tf.flags.DEFINE_boolean("allow_soft_placement", True,
-                        "Allow device soft device placement")
-tf.flags.DEFINE_boolean("log_device_placement", False,
-                        "Log placement of ops on devices")
 tf.flags.DEFINE_boolean("force_init", False,
                         "Whether to always start training from scratch")
 
@@ -112,40 +104,17 @@ def main(unused_argv):
 
     # Create the graph
     global_counter = tf.Variable(0, trainable=False)
-
-    if FLAGS.task == "A":
-        # For a) the embedding is a matrix to be learned from scratch
-        embedding_matrix = tf.get_variable(
-            name="embedding_matrix",
-            shape=[FLAGS.vocab_size, FLAGS.embedding_size],
-            dtype=tf.float32,
-            initializer=tf.contrib.layers.xavier_initializer())
-    else:
-        # For simplicity we do not use the code given but use the given
-        # embeddings directly.
-        # TODO confirm that this is okay for the tutors.
-        keys = []
-        emb = []
-        ext_emb = csv.reader(open(FLAGS.embedding), delimiter=' ')
-        for line in ext_emb:
-            keys += [line[0]]
-            emb += [list(map(float, line[1:]))]
-        given_emb = dict(zip(keys, emb))
-        external_embedding = np.zeros(shape=(FLAGS.vocab_size,
-                                             FLAGS.embedding_size))
-        for k, v in vocabulary.get_vocabulary_as_dict().items():
-            try:
-                external_embedding[v, :] = given_emb[k]
-            except KeyError:
-                print("Unmatched: %s" % k)
-                external_embedding[v, :] = \
-                    np.random.uniform(low=-0.25,
-                                      high=0.25,
-                                      size=FLAGS.embedding_size)
-        embedding_matrix = tf.Variable(external_embedding, dtype=tf.float32)
     input_words = tf.placeholder(tf.int32, [None, FLAGS.sentence_length])
     # add to collection for usage from restored model
     tf.add_to_collection("input_words", input_words)
+
+    embedding_matrix = tf.get_variable(
+        name="embedding_matrix",
+        shape=[FLAGS.vocab_size, FLAGS.embedding_size],
+        dtype=tf.float32,
+        initializer=tf.contrib.layers.xavier_initializer())
+
+
 
     embedded_words = tf.nn.embedding_lookup(embedding_matrix, input_words)
 
@@ -219,8 +188,10 @@ def main(unused_argv):
     else:
         logits = tf.matmul(tf.matmul(output, inter_w) + inter_b,
                            out_to_logit_w) + out_to_logit_b
-        l2_loss = (tf.nn.l2_loss(out_to_logit_w) + tf.nn.l2_loss(
-            inter_w)) * FLAGS.lambda_l2
+        # l2_loss = (tf.nn.l2_loss(out_to_logit_w) + tf.nn.l2_loss(
+        #     inter_w)) * FLAGS.lambda_l2
+        l2_loss = tf.nn.l2_loss(out_to_logit_w) * FLAGS.lambda_l2
+
 
     logits_reshaped = tf.transpose(tf.reshape(logits,
                                               [FLAGS.sentence_length, -1,
@@ -264,10 +235,7 @@ def main(unused_argv):
     tf.add_to_collection("perplexity", perplexity)
     tf.summary.scalar('perplexity', perplexity)
 
-    nominator = tf.reduce_sum(loss, axis=1)
-    denominator =  tf.reduce_sum(tf.to_float(
-            tf.not_equal(input_words[:, 1:],
-                         vocabulary.dict[vocabulary.PADDING])), axis=1)
+
 
     sentence_perplexity = \
         tf.pow(2.0, tf.reduce_sum(loss, axis=1) / tf.reduce_sum(tf.to_float(
@@ -276,7 +244,7 @@ def main(unused_argv):
     tf.summary.histogram('sPerplexity', sentence_perplexity)
 
     # TODO add learning_rate to summaries
-    optimiser = tf.train.AdamOptimizer(FLAGS.learning_rate)
+    optimiser = tf.train.AdamOptimizer(eff_rate)
 
     gradients, v = zip(*optimiser.compute_gradients(mean_loss))
     # TODO from the doc it looks as if we actually wanted to set use_norm to 10 instead. Confirm!
@@ -314,6 +282,7 @@ def main(unused_argv):
             train_summary_writer = tf.summary.FileWriter(train_summary_dir,
                                                          sess.graph)
 
+
             # Restoring or initialising session
             if not FLAGS.force_init:
                 try:
@@ -326,6 +295,13 @@ def main(unused_argv):
             else:
                 sess.run(init_op)
                 print("Initialised session")
+
+            #load the pretrained word embeddings from word2vec
+            if FLAGS.task is not "A":
+                print("assigning pretrained embedding")
+                with tf.Session() as session:
+                    load_embedding(session, vocabulary.get_vocabulary_as_dict(), embedding_matrix, FLAGS.embedding,
+                                   FLAGS.embedding_size, FLAGS.vocab_size)
 
             print("Start training")
             for data_train in batches_train:

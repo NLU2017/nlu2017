@@ -140,8 +140,6 @@ class Vocabulary:
 
     def is_init_or_pad(self, word_key):
         """returns true if the word_key (integer coding) is either the key for <pad> or <bos>"""
-        if self.inverse_dict is None:
-            self.get_inverse_voc_dict()
         try:
             word = self.inverse_dict[word_key]
         except KeyError:
