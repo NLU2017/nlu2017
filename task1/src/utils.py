@@ -110,13 +110,15 @@ class Vocabulary:
         max_words = min(Vocabulary.SIZE - len(Vocabulary.keywords), len(wordcount))
         self.words = sorted(wordcount, key=wordcount.get, reverse=True)[0:max_words]
         self.words.extend(Vocabulary.keywords)
+        self.dict = {k: v for v, k in enumerate(self.words)}
+        self.inverse_dict = {k: v for v, k in self.dict.items()}
 
     def get_vocabulary_as_dict(self):
-        self.dict = {k:v for v, k in enumerate(self.words)}
+        #self.dict = {k:v for v, k in enumerate(self.words)}
         return self.dict
 
     def get_inverse_voc_dict(self):
-        self.inverse_dict = {k:v for v,k in self.dict.items()}
+        #self.inverse_dict = {k:v for v,k in self.dict.items()}
         return self.inverse_dict
 
     def contains(self, word):
