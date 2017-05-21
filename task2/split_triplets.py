@@ -41,6 +41,14 @@ parser.add_argument(
 args = parser.parse_args()
 
 
+def find_max_length_in_words(sentences):
+    length = 0
+    for s in sentences:
+        le = len(s.split(" "))
+        if le > length:
+            length = le
+    return length
+
 
 fname = args.infile.name.split("/")[-1]
 prefix = fname.split(".")
@@ -51,7 +59,7 @@ target_filename = args.output_dir + "/" + prefix+ "_target.txt"
 
 source = []
 target = []
-
+max_length = 0
 for line in args.infile:
     utterances = line.strip().split("\t")
     assert len(utterances) == 3
@@ -60,14 +68,24 @@ for line in args.infile:
     target.append(utterances[1])
     target.append(utterances[2])
 
+print("max length of source {}".format(find_max_length_in_words(source)))
+print ("max length of targets: {}".format(find_max_length_in_words(target)))
+
 with io.open(source_filename, "w", encoding='utf8') as source_file:
     for record in source:
         source_file.write(record + "\n")
 
 print("done writing {}".format(source_filename))
 
+
+if args.type == 'reverse':
+    for (i, record) in enumerate(target):
+        target[i] = " ".join(reversed(record.split(" ")))
+
 with io.open(target_filename, "w", encoding='utf8') as target_file:
     for record in target:
         target_file.write(record + "\n")
+
+
 
 print("done writing {}".format(source_filename))

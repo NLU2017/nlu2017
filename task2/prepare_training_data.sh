@@ -6,10 +6,10 @@ VALIDATION_INPUT=$DATA_PATH/Validation_Shuffled_Dataset.txt
 SEQ2SEQ_TOOLS=seq2seq/bin/tools/
 
 echo " split triplets in training data"
-python ./split_triplets.py $TRAIN_INPUT
+python ./split_triplets.py --type=reverse $TRAIN_INPUT
 
 echo "split triplets in validation data"
-python ./split_triplets.py $VALIDATION_INPUT
+python ./split_triplets.py --type=reverse $VALIDATION_INPUT
 
 
 #generate the vocabular from the source file (contains the same data in terms of words as the target file...)
