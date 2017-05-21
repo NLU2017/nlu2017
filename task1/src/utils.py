@@ -110,13 +110,15 @@ class Vocabulary:
         max_words = min(Vocabulary.SIZE - len(Vocabulary.keywords), len(wordcount))
         self.words = sorted(wordcount, key=wordcount.get, reverse=True)[0:max_words]
         self.words.extend(Vocabulary.keywords)
+        self.dict = {k: v for v, k in enumerate(self.words)}
+        self.inverse_dict = {k: v for v, k in self.dict.items()}
 
     def get_vocabulary_as_dict(self):
-        self.dict = {k:v for v, k in enumerate(self.words)}
+        #self.dict = {k:v for v, k in enumerate(self.words)}
         return self.dict
 
     def get_inverse_voc_dict(self):
-        self.inverse_dict = {k:v for v,k in self.dict.items()}
+        #self.inverse_dict = {k:v for v,k in self.dict.items()}
         return self.inverse_dict
 
     def contains(self, word):
@@ -153,3 +155,19 @@ class Vocabulary:
         result = ' '.join(words).strip()
         return result
 
+
+
+def clean_and_cut_sentences(out_sentences):
+    sentences = []
+    for i in range(out_sentences.shape[0]):
+        words = []
+        j = 1
+        write = True
+        while (write and j <= 20):
+            words.append(out_sentences[i][j])
+            if out_sentences[i][j] == Vocabulary.END_SEQ:
+                write = False
+            j = j + 1
+
+        sentences.append(' '.join(words))
+    return sentences
