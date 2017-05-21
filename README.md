@@ -50,19 +50,45 @@ then do the [following](https://google.github.io/seq2seq/getting_started/)
 
 ```bash
 > git clone https://github.com/google/seq2seq.git
->cd seq2seq
+> cd seq2seq
 
 # Install package and dependencies
 pip install -e .
 
 ```
-you should then be able to run the unittests for the seq2seq model. 
+maybe you have to sudo for the pip install, I had to on the Azure VM.
+ The model uses `yml` configuration files, I had 
+to install the corresponding python module:
+```bash
+> pip install pyyaml
+
+```
+you should then be able to run the unittests for the seq2seq model.
+
 ```
 python -m unittest seq2seq.test.pipeline_test
 ```
-the model uses `yml` configuration files, I had to install the corresponding python module:
 
 
+For training the baselin model do the following:
+```bash
+> ./prepare_training_data.sh
+```
+this scripts creates a source file an a target file out of the triplets. It also outputs the maximal sequence length in the
+training data and generates a vocabulary by using the script from `seq2seq/bin/tools/generate_vocab.py`
+you can tune the number of words in the vocabulary and whether the target sequences should be reversed. See the script for details.
+
+With this run 
+```
+> run_training_baseline.sh
+```
+to start the training. Details for the baseline configuration are in `train_baseline.yml` it starts a Vanilla seq2seq model
+with the input data that we have generated before. I use reversed target data, and the BasicLSTMCell. I took the Encoder and Decoder 
+values from [source code of the basic model](https://github.com/google/seq2seq/blob/master/seq2seq/models/basic_seq2seq.py) 
+Don't know whether this makes sense. 
+
+There are some more model in the seq2seq Repo see the [Doku](https://google.github.io/seq2seq/models/#seq2seqmodel) and 
+the [translation tutorial](https://google.github.io/seq2seq/nmt/) for the config values.
 
 ## Contacts
 mark.bosshard@uzh.ch
