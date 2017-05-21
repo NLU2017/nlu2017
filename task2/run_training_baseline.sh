@@ -4,7 +4,7 @@ export SEQ2SEQ_PATH=${BASE_DIR}/seq2seq/
 export DATA_DIR=${BASE_DIR}/data
 export VOCAB_SOURCE=${DATA_DIR}/vocabulary_20000.txt
 export VOCAB_TARGET=${DATA_DIR}/vocabulary_20000.txt
-export TRAIN_SOURCES=${DATA_DIR/Training_Shuffled_Dataset_source.txt
+export TRAIN_SOURCES=${DATA_DIR}/Training_Shuffled_Dataset_source.txt
 export TRAIN_TARGETS=${DATA_DIR}/Training_Shuffled_Dataset_target.txt
 export DEV_SOURCES=${DATA_DIR}/Validation_Shuffled_Dataset_source.txt
 export DEV_TARGETS=${DATA_DIR}/Validation_Shuffled_Dataset_target.txt
@@ -16,7 +16,7 @@ export MODEL_DIR=${BASE_DIR}/runs/baseline
 mkdir -p $MODEL_DIR
 
 
-python3 -m ${SEQ2SEQ_PATH}/bin.train \
+python3 -m bin.train \
     --config_paths="
       ./train_baseline.yml,
       ${SEQ2SEQ_PATH}/example_configs/train_seq2seq.yml"\
