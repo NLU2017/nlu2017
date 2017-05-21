@@ -1,0 +1,3 @@
+*.tar.gz
+*.txt
+!vocabulary_20000.txt
