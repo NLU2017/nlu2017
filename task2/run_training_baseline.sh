@@ -1,6 +1,6 @@
 #!/bin/bash
 export BASE_DIR=$(pwd)
-export SEQ2SEQ_PATH=${BASE_DIR}/seq2seq/
+export SEQ2SEQ_PATH=${BASE_DIR}/seq2seq
 export DATA_DIR=${BASE_DIR}/data
 export VOCAB_SOURCE=${DATA_DIR}/vocabulary_20000.txt
 export VOCAB_TARGET=${DATA_DIR}/vocabulary_20000.txt
@@ -16,7 +16,7 @@ export MODEL_DIR=${BASE_DIR}/runs/baseline
 mkdir -p $MODEL_DIR
 
 
-python3 -m bin.train \
+python3 ${SEQ2SEQ_PATH}/bin/train.py \
     --config_paths="
       ./train_baseline.yml,
       ${SEQ2SEQ_PATH}/example_configs/train_seq2seq.yml"\
@@ -42,3 +42,4 @@ python3 -m bin.train \
   --output_dir $MODEL_DIR
 
 echo "done"
+
