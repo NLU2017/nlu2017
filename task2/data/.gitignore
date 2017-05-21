@@ -1,3 +1,7 @@
 *.tar.gz
 *.txt
-!vocabulary_20000.txt
+Training*
+Validation*
+MetaInfo.txt
+Readme.txt
+!vocabulary_*.txt
