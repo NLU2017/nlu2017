@@ -90,6 +90,13 @@ Don't know whether this makes sense.
 There are some more model in the seq2seq Repo see the [Doku](https://google.github.io/seq2seq/models/#seq2seqmodel) and 
 the [translation tutorial](https://google.github.io/seq2seq/nmt/) for the config values.
 
+###next steps
+There is already an Attention model `AttentionSeq2Seq`.
+For our own model we will have to write a model class which inherits from `ModelBase` and `Seq2SeqModel`. That is how I understood the thing.
+See [models reference](https://google.github.io/seq2seq/models/).
+Happy coding...
+
+
 ## Contacts
 mark.bosshard@uzh.ch
 

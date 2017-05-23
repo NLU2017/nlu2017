@@ -71,6 +71,11 @@ for line in args.infile:
 print("max length of source {}".format(find_max_length_in_words(source)))
 print ("max length of targets: {}".format(find_max_length_in_words(target)))
 
+
+if args.type == 'reverse':
+    for (i, record) in enumerate(source):
+        source[i] = " ".join(reversed(record.split(" ")))
+
 with io.open(source_filename, "w", encoding='utf8') as source_file:
     for record in source:
         source_file.write(record + "\n")
@@ -78,9 +83,6 @@ with io.open(source_filename, "w", encoding='utf8') as source_file:
 print("done writing {}".format(source_filename))
 
 
-if args.type == 'reverse':
-    for (i, record) in enumerate(target):
-        target[i] = " ".join(reversed(record.split(" ")))
 
 with io.open(target_filename, "w", encoding='utf8') as target_file:
     for record in target:

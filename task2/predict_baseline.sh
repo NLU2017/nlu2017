@@ -16,7 +16,7 @@ export MODEL_DIR=${BASE_DIR}/runs/baseline
 export PRED_DIR=${MODEL_DIR}/pred
 mkdir -p ${PRED_DIR}
 
-python -m bin/infer.py \
+python3 ${SEQ2SEQ_PATH}/bin/infer.py \
   --tasks "
     - class: DecodeText" \
   --model_dir $MODEL_DIR \
