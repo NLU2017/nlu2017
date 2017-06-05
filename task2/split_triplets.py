@@ -7,7 +7,7 @@ import numpy as np
 parser = argparse.ArgumentParser(
     description="Generate source and target files from the input files given (triplet per line separated by TAB. Both files will contain only 1 utterance per line: \n"
                 "where the line k in the source is the input for the line k in target\n"
-                "the original triplets are split: 1 (source)-> 2 (target), 2(source) -> 3(target)")
+                "the original triplets are split: 1 (source1), 2 (source2), 3 (target)")
 parser.add_argument(
     "infile",
     nargs="?",
@@ -57,27 +57,32 @@ if len(prefix) > 1:
 source_filename = args.output_dir + "/" + prefix+ "_source.txt"
 target_filename = args.output_dir + "/" + prefix+ "_target.txt"
 
-source = []
+source1 = []
+source2 = []
 target = []
 max_length = 0
 for line in args.infile:
     utterances = line.strip().split("\t")
     assert len(utterances) == 3
-    source.append(utterances[0])
-    source.append(utterances[1])
-    target.append(utterances[1])
+    source1.append(utterances[0])
+    source2.append(utterances[1])
     target.append(utterances[2])
 
-print("max length of source {}".format(find_max_length_in_words(source)))
+print("max length of source1 {}".format(find_max_length_in_words(source1)))
+print("max length of source2 {}".format(find_max_length_in_words(source2)))
 print ("max length of targets: {}".format(find_max_length_in_words(target)))
 
 
 if args.type == 'reverse':
     for (i, record) in enumerate(source):
-        source[i] = " ".join(reversed(record.split(" ")))
+        source2[i] = " ".join(reversed(record.split(" ")))
 
-with io.open(source_filename, "w", encoding='utf8') as source_file:
-    for record in source:
+with io.open(source_filename[:-4] + "1" + source_filename[-4:], "w", encoding='utf8') as source_file:
+    for record in source1:
+        source_file.write(record + "\n")
+
+with io.open(source_filename[:-4] + "2" + source_filename[-4:], "w", encoding='utf8') as source_file:
+    for record in source2:
         source_file.write(record + "\n")
 
 print("done writing {}".format(source_filename))
