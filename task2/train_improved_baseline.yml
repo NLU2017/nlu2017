@@ -2,7 +2,7 @@ model: BasicSeq2Seq
 model_params:
   bridge.class: seq2seq.models.bridges.InitialStateBridge
   embedding.dim: 256
-  encoder.class: seq2seq.encoders.TwoToOneEncoder
+  encoder.class: TwoToOneEncoder
   encoder.params:
     rnn_cell0:
       cell_class: LSTMBlockCell
