@@ -2,16 +2,9 @@ model: BasicSeq2Seq
 model_params:
   bridge.class: seq2seq.models.bridges.InitialStateBridge
   embedding.dim: 256
-  encoder.class: seq2seq.encoders.two_to_one_encoder.TwoToOneEcnoder
+  encoder.class: seq2seq.encoders.two_to_one_encoder.TwoToOneEncoder
   encoder.params:
-    rnn_cell0:
-      cell_class: LSTMBlockCell
-      cell_params:
-        num_units: 256
-      dropout_input_keep_prob: 0.8
-      dropout_output_keep_prob: 1.0
-      num_layers: 1
-    rnn_cell1:
+    rnn_cell:
       cell_class: LSTMBlockCell
       cell_params:
         num_units: 256
