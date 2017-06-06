@@ -92,17 +92,25 @@ class TwoToOneEcnoder(BidirectionalRNNEncoder):
             dtype=tf.float32,
             **kwargs)
 
-    print("after bidirectional_dynamic")
+    print("after bidirectional_dynamic-----------------------------------------------------------------------------------------------------------------------------------")
+    print(states0)
+    print(states1)
     outputs0_concat = tf.concat(outputs0, 2)
     outputs1_concat = tf.concat(outputs1, 2)
     outputs_concat = tf.concat([outputs0_concat, outputs1_concat], 2)
 
-    states_fw = tf.concat((states0[0], states1[0]), 2)
-    states_bw = tf.concat((states0[1], states1[1]), 2)
+    # states_fw = tf.concat((states0[0], states1[0]), 2)
+    # states_bw = tf.concat((states0[1], states1[1]), 2)
 
-    states = (states_fw, states_bw)
+    states = (tf.contrib.rnn.LSTMStateTuple(
+        c=tf.concat([states0[0][0], states1[0][0]], 1),
+        h=tf.concat([states0[0][1], states1[0][1]], 1)),
+          tf.contrib.rnn.LSTMStateTuple(
+              c=tf.concat([states0[1][0], states1[1][0]], 1),
+              h=tf.concat([states0[1][1], states1[1][1]], 1))
+    )
 
-    print("DEBUG: output and state format")
+    print("DEBUG: ---------------------------------------------------------------------------------------------------------------------------------------output and state format")
     print(outputs_concat)
     print(states)
 
