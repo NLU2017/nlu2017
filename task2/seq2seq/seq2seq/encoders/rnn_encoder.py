@@ -97,6 +97,9 @@ class UnidirectionalRNNEncoder(Encoder):
         sequence_length=sequence_length,
         dtype=tf.float32,
         **kwargs)
+    print("Checking outputs and states size")
+    print(outputs)
+    print(state)
     return EncoderOutput(
         outputs=outputs,
         final_state=state,
@@ -144,6 +147,10 @@ class BidirectionalRNNEncoder(Encoder):
 
     # Concatenate outputs and states of the forward and backward RNNs
     outputs_concat = tf.concat(outputs, 2)
+
+    print("DEBUG ------------ outputs and states")
+    print(outputs_concat)
+    print(states)
 
     return EncoderOutput(
         outputs=outputs_concat,
