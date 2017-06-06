@@ -55,6 +55,7 @@ prefix = fname.split(".")
 if len(prefix) > 1:
     prefix = prefix[-2]
 source_filename = args.output_dir + "/" + prefix+ "_source.txt"
+source_reversed_filename = args.output_dir+"/" + prefix +"_source_reversed.txt"
 target_filename = args.output_dir + "/" + prefix+ "_target.txt"
 
 source = []
@@ -71,16 +72,21 @@ for line in args.infile:
 print("max length of source {}".format(find_max_length_in_words(source)))
 print ("max length of targets: {}".format(find_max_length_in_words(target)))
 
-
-if args.type == 'reverse':
-    for (i, record) in enumerate(source):
-        source[i] = " ".join(reversed(record.split(" ")))
-
 with io.open(source_filename, "w", encoding='utf8') as source_file:
     for record in source:
         source_file.write(record + "\n")
 
 print("done writing {}".format(source_filename))
+
+if args.type == 'reverse':
+    for (i, record) in enumerate(source):
+        source[i] = " ".join(reversed(record.split(" ")))
+
+    with io.open(source_reversed_filename, "w", encoding='utf8') as source_file:
+        for record in source:
+            source_file.write(record + "\n")
+
+    print("done writing {}".format(source_reversed_filename))
 
 
 
@@ -89,5 +95,4 @@ with io.open(target_filename, "w", encoding='utf8') as target_file:
         target_file.write(record + "\n")
 
 
-
-print("done writing {}".format(source_filename))
+print("done writing {}".format(target_filename))
