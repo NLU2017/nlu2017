@@ -33,6 +33,7 @@ from tensorflow.contrib.slim.python.slim.data import tfexample_decoder
 
 from seq2seq.configurable import Configurable
 from seq2seq.data import split_tokens_decoder, parallel_data_provider
+from seq2seq.data import parallel_input_data_provider
 from seq2seq.data.sequence_example_decoder import TFSEquenceExampleDecoder
 
 
@@ -179,6 +180,8 @@ class ParallelTextInputPipeline(InputPipeline):
         num_epochs=self.params["num_epochs"],
         **kwargs)
 
+
+
   @property
   def feature_keys(self):
     return set(["source_tokens", "source_len"])
@@ -187,6 +190,91 @@ class ParallelTextInputPipeline(InputPipeline):
   def label_keys(self):
     return set(["target_tokens", "target_len"])
 
+
+class DoubleSourceParallelTextInputPipeline(InputPipeline):
+    """An input pipeline that reads two parallel (line-by-line aligned) text
+    files.
+
+    Params:
+      source_files: An array of file names for the source data.
+      target_files: An array of file names for the target data. These must
+        be aligned to the `source_files`.
+      source_delimiter: A character to split the source text on. Defaults
+        to  " " (space). For character-level training this can be set to the
+        empty string.
+      target_delimiter: Same as `source_delimiter` but for the target text.
+    """
+
+    @staticmethod
+    def default_params():
+        params = InputPipeline.default_params()
+        params.update({
+            "source1_files": [],
+            "source2_files":[],
+            "target_files": [],
+            "source_delimiter": " ",
+            "target_delimiter": " ",
+        })
+        return params
+
+    def make_data_provider(self, **kwargs):
+        decoder_source1 = split_tokens_decoder.SplitTokensDecoder(
+            tokens_feature_name="source_tokens",
+            length_feature_name="source_len",
+            append_token="SEQUENCE1_END",
+            delimiter=self.params["source_delimiter"])
+
+        dataset_source1 = tf.contrib.slim.dataset.Dataset(
+            data_sources=self.params["source1_files"],
+            reader=tf.TextLineReader,
+            decoder=decoder_source1,
+            num_samples=None,
+            items_to_descriptions={})
+
+        decoder_source2 = split_tokens_decoder.SplitTokensDecoder(
+            tokens_feature_name="source_tokens",
+            length_feature_name="source_len",
+            append_token="SEQUENCE_END",
+            delimiter=self.params["source_delimiter"])
+
+        dataset_source2 = tf.contrib.slim.dataset.Dataset(
+            data_sources=self.params["source2_files"],
+            reader=tf.TextLineReader,
+            decoder=decoder_source2,
+            num_samples=None,
+            items_to_descriptions={})
+
+        dataset_target = None
+        if len(self.params["target_files"]) > 0:
+            decoder_target = split_tokens_decoder.SplitTokensDecoder(
+                tokens_feature_name="target_tokens",
+                length_feature_name="target_len",
+                prepend_token="SEQUENCE_START",
+                append_token="SEQUENCE_END",
+                delimiter=self.params["target_delimiter"])
+
+            dataset_target = tf.contrib.slim.dataset.Dataset(
+                data_sources=self.params["target_files"],
+                reader=tf.TextLineReader,
+                decoder=decoder_target,
+                num_samples=None,
+                items_to_descriptions={})
+
+        return parallel_input_data_provider.ParallelInputDataProvider(
+            dataset1=dataset_source1,
+            dataset2 = dataset_source2,
+            dataset3=dataset_target,
+            shuffle=self.params["shuffle"],
+            num_epochs=self.params["num_epochs"],
+            **kwargs)
+
+    @property
+    def feature_keys(self):
+        return set(["source_tokens", "source_len"])
+
+    @property
+    def label_keys(self):
+        return set(["target_tokens", "target_len"])
 
 class TFRecordInputPipeline(InputPipeline):
   """An input pipeline that reads a TFRecords containing both source

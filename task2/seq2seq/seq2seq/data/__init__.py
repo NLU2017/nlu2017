@@ -15,6 +15,7 @@
 """
 
 from seq2seq.data import input_pipeline
+from seq2seq.data import parallel_input_data_provider
 from seq2seq.data import parallel_data_provider
 from seq2seq.data import postproc
 from seq2seq.data import split_tokens_decoder

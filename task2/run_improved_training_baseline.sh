@@ -26,17 +26,20 @@ python3 ${SEQ2SEQ_PATH}/bin/train.py \
       vocab_source: $VOCAB_SOURCE
       vocab_target: $VOCAB_TARGET" \
   --input_pipeline_train "
-    class: ParallelTextInputPipeline
+    class: DoubleSourceParallelTextInputPipeline
     params:
-      source_files:
-        - [$TRAIN_SOURCES1, $TRAIN_SOURCES2]
+      source1_files:
+        - $TRAIN_SOURCES1
+      source2_files:
+        - $TRAIN_SOURCES2
       target_files:
         - $TRAIN_TARGETS" \
   --input_pipeline_dev "
-    class: ParallelTextInputPipeline
+    class: DoubleSourceParallelTextInputPipeline
     params:
-       source_files:
+       source1_files:
         - $DEV_SOURCES1
+       source2_files:
         - $DEV_SOURCES2
        target_files:
         - $DEV_TARGETS" \
