@@ -50,14 +50,14 @@ class TwoToOneEcnoder(BidirectionalRNNEncoder):
 
   def __init__(self, params, mode, name="twotoone_rnn_encoder"):
     super(BidirectionalRNNEncoder, self).__init__(params, mode, name)
-    self.params["rnn_cell0"] = _toggle_dropout(self.params["rnn_cell0"], mode)
-    self.params["rnn_cell1"] = _toggle_dropout(self.params["rnn_cell1"], mode)
+    self.params["rnn_cell"] = _toggle_dropout(self.params["rnn_cell"], mode)
+    self.params["rnn_cell"] = _toggle_dropout(self.params["rnn_cell"], mode)
 
   @staticmethod
   def default_params():
     return {
-        "rnn_cell0": _default_rnn_cell_params(),
-        "rnn_cell1": _default_rnn_cell_params(),
+        "rnn_cell": _default_rnn_cell_params(),
+        "rnn_cell": _default_rnn_cell_params(),
         "init_scale": 0.04,
     }
 
@@ -68,29 +68,29 @@ class TwoToOneEcnoder(BidirectionalRNNEncoder):
         self.params["init_scale"]))
 
 
-    cell_fw0 = training_utils.get_rnn_cell(**self.params["rnn_cell0"])
-    cell_bw0 = training_utils.get_rnn_cell(**self.params["rnn_cell0"])
-    print("inputs {}".format(inputs.get_shape()))
-    outputs0, states0 = tf.nn.bidirectional_dynamic_rnn(
-        cell_fw=cell_fw0,
-        cell_bw=cell_bw0,
-        inputs=inputs,
-        sequence_length=sequence_length,
-        dtype=tf.float32,
-        **kwargs)
+    with tf.variable_scope("reader_1"):
+        cell_fw0 = training_utils.get_rnn_cell(**self.params["rnn_cell"])
+        cell_bw0 = training_utils.get_rnn_cell(**self.params["rnn_cell"])
+        print("inputs {}".format(inputs.get_shape()))
+        outputs0, states0 = tf.nn.bidirectional_dynamic_rnn(
+            cell_fw=cell_fw0,
+            cell_bw=cell_bw0,
+            inputs=inputs,
+            sequence_length=sequence_length,
+            dtype=tf.float32,
+            **kwargs)
 
-
-
-    cell_fw1 = training_utils.get_rnn_cell(**self.params["rnn_cell1"])
-    cell_bw1 = training_utils.get_rnn_cell(**self.params["rnn_cell1"])
-    print("seconds cell allright")
-    outputs1, states1 = tf.nn.bidirectional_dynamic_rnn(
-        cell_fw=cell_fw1,
-        cell_bw=cell_bw1,
-        inputs=inputs,
-        sequence_length=sequence_length,
-        dtype=tf.float32,
-        **kwargs)
+    with tf.variable_scope("reader_2"):
+        cell_fw1 = training_utils.get_rnn_cell(**self.params["rnn_cell"])
+        cell_bw1 = training_utils.get_rnn_cell(**self.params["rnn_cell"])
+        print("seconds cell allright")
+        outputs1, states1 = tf.nn.bidirectional_dynamic_rnn(
+            cell_fw=cell_fw1,
+            cell_bw=cell_bw1,
+            inputs=inputs,
+            sequence_length=sequence_length,
+            dtype=tf.float32,
+            **kwargs)
 
     print("after bidirectional_dynamic")
     outputs0_concat = tf.concat(outputs0, 2)
@@ -100,9 +100,66 @@ class TwoToOneEcnoder(BidirectionalRNNEncoder):
     states_fw = tf.concat((states0[0], states1[0]), 2)
     states_bw = tf.concat((states0[1], states1[1]), 2)
 
+    states = (states_fw, states_bw)
+
+    print("DEBUG: output and state format")
+    print(outputs_concat)
+    print(states)
 
     return EncoderOutput(
         outputs=outputs_concat,
-        final_state=(states_fw, states_bw),
+        final_state=states,
         attention_values=outputs_concat,
+        attention_values_length=sequence_length)
+
+class TwoToOneEncoder(Encoder):
+  def __init__(self, params, mode, name="forward_rnn_encoder"):
+    super(TwoToOneEncoder, self).__init__(params, mode, name)
+    self.params["rnn_cell"] = _toggle_dropout(self.params["rnn_cell"], mode)
+
+  @staticmethod
+  def default_params():
+    return {
+        "rnn_cell": _default_rnn_cell_params(),
+        "init_scale": 0.04,
+    }
+
+  def encode(self, inputs, sequence_length, **kwargs):
+    scope = tf.get_variable_scope()
+    scope.set_initializer(tf.random_uniform_initializer(
+        -self.params["init_scale"],
+        self.params["init_scale"]))
+
+    cell1 = training_utils.get_rnn_cell(**self.params["rnn_cell"])
+    cell2 = training_utils.get_rnn_cell(**self.params["rnn_cell"])
+
+    with tf.variable_scope("reader_1"):
+        outputs1, state1 = tf.nn.dynamic_rnn(
+            cell=cell1,
+            inputs=inputs,
+            sequence_length=sequence_length,
+            dtype=tf.float32,
+            **kwargs)
+
+    with tf.variable_scope("reader_2"):
+        outputs2, state2 = tf.nn.dynamic_rnn(
+            cell=cell2,
+            inputs=inputs,
+            sequence_length=sequence_length,
+            dtype=tf.float32,
+            **kwargs)
+
+    outputs = tf.concat([outputs1, outputs2], 2)
+    state = tf.contrib.rnn.LSTMStateTuple(
+        c=tf.concat([state1[0], state2[0]], 1),
+        h=tf.concat([state1[1], state2[1]], 1))
+
+    print("Checking outputs and states size")
+    print(outputs)
+    print(state)
+
+    return EncoderOutput(
+        outputs=outputs,
+        final_state=state,
+        attention_values=outputs,
         attention_values_length=sequence_length)
