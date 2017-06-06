@@ -6,7 +6,6 @@ task1/data/*
 task1/runs/*
 
 tensorflow_models
-task2/seq2seq
 task2/runs
 task2/data
 !task2/data/.gitignore
