@@ -11,7 +11,7 @@ export DEV_TARGETS=${DATA_DIR}/Validation_Shuffled_Dataset_target.txt
 
 export DEV_TARGETS_REF=${DATA_DIR}/Validation_Shuffled_Dataset_target.txt
 
-export MODEL_DIR=${BASE_DIR}/runs/baseline
+export MODEL_DIR=${BASE_DIR}/runs/attention
 
 export PRED_DIR=${MODEL_DIR}/pred
 mkdir -p ${PRED_DIR}
@@ -19,14 +19,8 @@ mkdir -p ${PRED_DIR}
 python3 ${SEQ2SEQ_PATH}/bin/infer.py \
   --tasks "
     - class: DecodeText
-        params:
-            unk_replace:True
-    - class: DumpBeams
       params:
-        file: ${PRED_DIR}/beams.npz
-    - class: DumpAttention
-        params:
-            output_dir: $PRED_DIR/attention"
+      unk_replace: True"\
   --model_dir $MODEL_DIR \
   --model_params "
     inference.beam_search.beam_width: 5" \
@@ -35,6 +29,6 @@ python3 ${SEQ2SEQ_PATH}/bin/infer.py \
     params:
       source_files:
         - $DEV_SOURCES" \
-  >  ${PRED_DIR}/predictions_baseline.txt
+  >  ${PRED_DIR}/predictions_attention.txt
 
-./bin/tools/multi-bleu.perl ${DEV_TARGETS_REF} < ${PRED_DIR}/predictions.txt
+${SEQ2SEQ_PATH}/bin/tools/multi-bleu.perl ${DEV_TARGETS_REF} < ${PRED_DIR}/predictions_attention.txt

@@ -18,7 +18,7 @@ mkdir -p $MODEL_DIR
 
 python3 ${SEQ2SEQ_PATH}/bin/train.py \
     --config_paths="
-      ./train_attention.yml,
+       ./train_attention.yml,
       ${SEQ2SEQ_PATH}/example_configs/train_seq2seq.yml"\
   --model_params "
       vocab_source: $VOCAB_SOURCE
