@@ -170,16 +170,21 @@ class ParallelInputDataProvider(data_provider.DataProvider):
       data_source, data_target = shuffle_queue.dequeue()
 
     # Decode source items
+    #items are source1_len and source1_tokens
     items1 = dataset1.decoder.list_items()
     tensors1 = dataset1.decoder.decode(data_source1, items1)
 
+    #that is the one that always exists
+    #items are source_len, source_tokens
     items2 = dataset2.decoder.list_items()
     tensors2 = dataset2.decoder.decode(data_source2, items2)
+
 
     if dataset3 is not None:
       # Decode target items
       items_t = dataset3.decoder.list_items()
       tensors_t = dataset3.decoder.decode(data_target, items_t)
+
 
       # Merge items and results
       items = items1 + items2 + items_t

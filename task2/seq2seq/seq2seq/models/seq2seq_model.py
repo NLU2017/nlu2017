@@ -63,6 +63,7 @@ class Seq2SeqModel(ModelBase):
         "optimizer.clip_embed_gradients": 0.1,
         "vocab_source": "",
         "vocab_target": "",
+        "source.double_input":False
     })
     return params
 
@@ -187,7 +188,7 @@ class Seq2SeqModel(ModelBase):
     """
     return self.params["inference.beam_search.beam_width"] > 1
 
-  def _preprocess(self, features, labels):
+  def  _preprocess(self, features, labels):
     """Model-specific preprocessing for features and labels:
 
     - Creates vocabulary lookup tables for source and target vocab
@@ -219,10 +220,20 @@ class Seq2SeqModel(ModelBase):
           "source.max_seq_len"]]
       features["source_len"] = tf.minimum(features["source_len"],
                                           self.params["source.max_seq_len"])
+      if self.params["source.double_input"]:
+        print(features)
+        features["source1_tokens"] = features["source1_tokens"][:, :self.params[
+          "source.max_seq_len"]]
+        features["source1_len"] = tf.minimum(features["source1_len"],
+                                          self.params["source.max_seq_len"])
 
     # Look up the source ids in the vocabulary
     features["source_ids"] = source_vocab_to_id.lookup(features[
         "source_tokens"])
+    if self.params["source.double_input"]:
+        features["source1_ids"] = source_vocab_to_id.lookup(features[
+        "source1_tokens"])
+
 
     # Maybe reverse the source
     if self.params["source.reverse"] is True:
@@ -232,9 +243,20 @@ class Seq2SeqModel(ModelBase):
           seq_dim=1,
           batch_dim=0,
           name=None)
+      if self.params["source.double_input"]:
+            features["source1_ids"] = tf.reverse_sequence(
+                input=features["source1_ids"],
+                seq_lengths=features["source1_len"],
+                seq_dim=1,
+                batch_dim=0,
+                name=None)
 
     features["source_len"] = tf.to_int32(features["source_len"])
     tf.summary.histogram("source_len", tf.to_float(features["source_len"]))
+
+    if self.params["source.double_input"]:
+        features["source1_len"] = tf.to_int32(features["source1_len"])
+        tf.summary.histogram("source1_len", tf.to_float(features["source1_len"]))
 
     if labels is None:
       return features, None
@@ -257,12 +279,17 @@ class Seq2SeqModel(ModelBase):
     # Keep track of the number of processed tokens
     num_tokens = tf.reduce_sum(labels["target_len"])
     num_tokens += tf.reduce_sum(features["source_len"])
+    if self.params["source.double_input"]:
+        num_tokens += tf.reduce_sum(features["source1_len"])
+
     token_counter_var = tf.Variable(0, "tokens_counter")
     total_tokens = tf.assign_add(token_counter_var, num_tokens)
     tf.summary.scalar("num_tokens", total_tokens)
 
     with tf.control_dependencies([total_tokens]):
       features["source_tokens"] = tf.identity(features["source_tokens"])
+      if self.params["source.double_input"]:
+          features["source1_tokens"] = tf.identity(features["source1_tokens"])
 
     # Add to graph collection for later use
     graph_utils.add_dict_to_collection(features, "features")

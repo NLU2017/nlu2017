@@ -219,9 +219,9 @@ class DoubleSourceParallelTextInputPipeline(InputPipeline):
 
     def make_data_provider(self, **kwargs):
         decoder_source1 = split_tokens_decoder.SplitTokensDecoder(
-            tokens_feature_name="source_tokens",
-            length_feature_name="source_len",
-            append_token="SEQUENCE1_END",
+            tokens_feature_name="source1_tokens",
+            length_feature_name="source1_len",
+            append_token="SEQUENCE_END",
             delimiter=self.params["source_delimiter"])
 
         dataset_source1 = tf.contrib.slim.dataset.Dataset(
@@ -270,7 +270,7 @@ class DoubleSourceParallelTextInputPipeline(InputPipeline):
 
     @property
     def feature_keys(self):
-        return set(["source_tokens", "source_len"])
+        return set(["source1_tokens", "source1_len","source_tokens", "source_len"])
 
     @property
     def label_keys(self):

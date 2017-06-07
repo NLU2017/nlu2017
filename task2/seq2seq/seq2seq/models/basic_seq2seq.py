@@ -105,12 +105,16 @@ class BasicSeq2Seq(Seq2SeqModel):
 
   @templatemethod("encode")
   def encode(self, features, labels):
+    print("features {}".format(features))
     source_embedded = tf.nn.embedding_lookup(self.source_embedding,
                                              features["source_ids"])
-    print(self.params['encoder.class'])
+
+    if features["source1_ids"] is not None:
+        source1_embedded = tf.nn.embedding_lookup(self.source_embedding,
+                                             features["source1_ids"])
+        source_embedded = [source1_embedded, source_embedded]
     encoder_fn = self.encoder_class(self.params["encoder.params"], self.mode)
-    print(features)
-    print(source_embedded.shape)
+
     return encoder_fn(source_embedded, features["source_len"])
 
   @templatemethod("decode")

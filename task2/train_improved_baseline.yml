@@ -24,4 +24,5 @@ model_params:
   optimizer.learning_rate: 0.0001
   source.max_seq_len: 1482
   source.reverse: true
+  source.double_input: true
   target.max_seq_len: 1482
