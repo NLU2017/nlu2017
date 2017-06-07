@@ -327,7 +327,7 @@ class Seq2SeqModel(ModelBase):
     if self.mode == tf.contrib.learn.ModeKeys.INFER:
       predictions = self._create_predictions(
           decoder_output=decoder_output, features=features, labels=labels)
-      loss = None
+      losses, loss = self.compute_loss(decoder_output, features, labels)
       train_op = None
     else:
       losses, loss = self.compute_loss(decoder_output, features, labels)

@@ -83,7 +83,6 @@ class BidirectionalTwoToOneEncoder(BidirectionalRNNEncoder):
     with tf.variable_scope("reader_2"):
         cell_fw1 = training_utils.get_rnn_cell(**self.params["rnn_cell"])
         cell_bw1 = training_utils.get_rnn_cell(**self.params["rnn_cell"])
-        print("seconds cell allright")
         outputs1, states1 = tf.nn.bidirectional_dynamic_rnn(
             cell_fw=cell_fw1,
             cell_bw=cell_bw1,
