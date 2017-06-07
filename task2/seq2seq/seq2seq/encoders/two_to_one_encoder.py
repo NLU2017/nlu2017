@@ -37,7 +37,7 @@ def _toggle_dropout(cell_params, mode):
     cell_params["dropout_output_keep_prob"] = 1.0
   return cell_params
 
-class TwoToOneEcnoder(BidirectionalRNNEncoder):
+class BidirectionalTwoToOneEncoder(BidirectionalRNNEncoder):
   """
   A bidirectional RNN encoder. Uses the same cell for both the
   forward and backward RNN. Stacking should be performed as part of
