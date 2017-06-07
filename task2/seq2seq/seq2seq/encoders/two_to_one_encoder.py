@@ -97,7 +97,7 @@ class BidirectionalTwoToOneEncoder(BidirectionalRNNEncoder):
     print(states1)
     outputs0_concat = tf.concat(outputs0, 2)
     outputs1_concat = tf.concat(outputs1, 2)
-    outputs_concat = tf.concat([outputs0_concat, outputs1_concat], 2)
+    outputs_concat = tf.concat([outputs0_concat, outputs1_concat], 1)
 
     # states_fw = tf.concat((states0[0], states1[0]), 2)
     # states_bw = tf.concat((states0[1], states1[1]), 2)
@@ -109,7 +109,8 @@ class BidirectionalTwoToOneEncoder(BidirectionalRNNEncoder):
               c=tf.concat([states0[1][0], states1[1][0]], 1),
               h=tf.concat([states0[1][1], states1[1][1]], 1))
     )
-
+    #since we concat the states we have to add the two sequence lengths for each sample
+    lengths = tf.reduce_sum(tf.stack([sequence_length[0], sequence_length[1]],0), 0)
     print("DEBUG: ---------------------------------------------------------------------------------------------------------------------------------------output and state format")
     print(outputs_concat)
     print(states)
@@ -118,7 +119,7 @@ class BidirectionalTwoToOneEncoder(BidirectionalRNNEncoder):
         outputs=outputs_concat,
         final_state=states,
         attention_values=outputs_concat,
-        attention_values_length=sequence_length)
+        attention_values_length=lengths)
 
 class TwoToOneEncoder(Encoder):
   def __init__(self, params, mode, name="forward_rnn_encoder"):
@@ -161,6 +162,7 @@ class TwoToOneEncoder(Encoder):
     state = tf.contrib.rnn.LSTMStateTuple(
         c=tf.concat([state1[0], state2[0]], 1),
         h=tf.concat([state1[1], state2[1]], 1))
+    lengths = tf.reduce_sum(tf.stack([sequence_length[0], sequence_length[1]], 0), 0)
 
     print("Checking outputs and states size")
     print(outputs)
@@ -170,4 +172,4 @@ class TwoToOneEncoder(Encoder):
         outputs=outputs,
         final_state=state,
         attention_values=outputs,
-        attention_values_length=sequence_length)
+        attention_values_length=lengths)
