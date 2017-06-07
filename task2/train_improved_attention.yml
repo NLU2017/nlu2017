@@ -3,7 +3,7 @@ model_params:
   attention.class: seq2seq.decoders.attention.AttentionLayerBahdanau
   attention.params:
     num_units: 512
-  bridge.class: seq2seq.models.bridges.ZeroBridge
+  bridge.class: seq2seq.models.bridges.InitialStateBridge
   embedding.dim: 256
   encoder.class: seq2seq.encoders.two_to_one_encoder.BidirectionalTwoToOneEncoder
   encoder.params:
@@ -25,7 +25,7 @@ model_params:
       num_layers: 2
   optimizer.name: Adam
   optimizer.learning_rate: 0.0001
-  source.max_seq_len: 400
+  source.max_seq_len: 100
   source.reverse: false
   source.double_input: true
-  target.max_seq_len: 400
+  target.max_seq_len: 100

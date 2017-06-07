@@ -32,6 +32,14 @@ parser.add_argument(
     default="./data",
     type=str,
     help="path to the output directory (default: ./data)")
+
+parser.add_argument(
+    "--fix_prefix",
+    dest="fix_prefix",
+    default="",
+    type=str,
+    help="If given, this fix prefix is being used")
+
 args = parser.parse_args()
 
 
@@ -46,6 +54,8 @@ def find_max_length_in_words(sentences):
 
 fname = args.infile.name.split("/")[-1]
 prefix = fname.split(".")
+if args.fix_prefix is not "":
+    prefix = args.fix_prefix
 if len(prefix) > 1:
     prefix = prefix[-2]
 source1_filename = args.output_dir + "/" + prefix+ "_source_d1.txt"

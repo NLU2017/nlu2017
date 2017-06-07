@@ -19,7 +19,7 @@ mkdir -p ${PRED_DIR}
 
 python3 ${SEQ2SEQ_PATH}/bin/infer.py \
   --tasks "
-    - class: DecodeText" \
+    - class: GetPerplexity" \
   --model_dir $MODEL_DIR \
    --model_params "
     inference.beam_search.beam_width: 5" \
@@ -32,4 +32,4 @@ python3 ${SEQ2SEQ_PATH}/bin/infer.py \
         - $DEV_SOURCES2
        target_files:
         - $DEV_TARGETS" \
-  >  ${PRED_DIR}/predictions_baseline.txt
+  >  ${PRED_DIR}/predictions_improved_attention.txt
