@@ -76,7 +76,7 @@ class BidirectionalTwoToOneEncoder(BidirectionalRNNEncoder):
             cell_fw=cell_fw0,
             cell_bw=cell_bw0,
             inputs=inputs[0],
-            sequence_length=sequence_length,
+            sequence_length=sequence_length[0],
             dtype=tf.float32,
             **kwargs)
 
@@ -88,7 +88,7 @@ class BidirectionalTwoToOneEncoder(BidirectionalRNNEncoder):
             cell_fw=cell_fw1,
             cell_bw=cell_bw1,
             inputs=inputs[1],
-            sequence_length=sequence_length,
+            sequence_length=sequence_length[1],
             dtype=tf.float32,
             **kwargs)
 
@@ -145,7 +145,7 @@ class TwoToOneEncoder(Encoder):
         outputs1, state1 = tf.nn.dynamic_rnn(
             cell=cell1,
             inputs=inputs[0],
-            sequence_length=sequence_length,
+            sequence_length=sequence_length[0],
             dtype=tf.float32,
             **kwargs)
 
@@ -153,7 +153,7 @@ class TwoToOneEncoder(Encoder):
         outputs2, state2 = tf.nn.dynamic_rnn(
             cell=cell2,
             inputs=inputs[1],
-            sequence_length=sequence_length,
+            sequence_length=sequence_length[1],
             dtype=tf.float32,
             **kwargs)
 
