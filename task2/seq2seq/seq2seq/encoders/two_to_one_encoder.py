@@ -71,7 +71,7 @@ class TwoToOneEcnoder(BidirectionalRNNEncoder):
     with tf.variable_scope("reader_1"):
         cell_fw0 = training_utils.get_rnn_cell(**self.params["rnn_cell"])
         cell_bw0 = training_utils.get_rnn_cell(**self.params["rnn_cell"])
-        print("inputs {}".format(inputs.get_shape()))
+
         outputs0, states0 = tf.nn.bidirectional_dynamic_rnn(
             cell_fw=cell_fw0,
             cell_bw=cell_bw0,
