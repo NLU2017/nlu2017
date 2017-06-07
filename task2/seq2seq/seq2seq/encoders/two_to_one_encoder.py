@@ -92,9 +92,6 @@ class BidirectionalTwoToOneEncoder(BidirectionalRNNEncoder):
             dtype=tf.float32,
             **kwargs)
 
-    print("after bidirectional_dynamic-----------------------------------------------------------------------------------------------------------------------------------")
-    print(states0)
-    print(states1)
     outputs0_concat = tf.concat(outputs0, 2)
     outputs1_concat = tf.concat(outputs1, 2)
     outputs_concat = tf.concat([outputs0_concat, outputs1_concat], 1)
@@ -111,9 +108,6 @@ class BidirectionalTwoToOneEncoder(BidirectionalRNNEncoder):
     )
     #since we concat the states we have to add the two sequence lengths for each sample
     lengths = tf.reduce_sum(tf.stack([sequence_length[0], sequence_length[1]],0), 0)
-    print("DEBUG: ---------------------------------------------------------------------------------------------------------------------------------------output and state format")
-    print(outputs_concat)
-    print(states)
 
     return EncoderOutput(
         outputs=outputs_concat,
@@ -163,10 +157,6 @@ class TwoToOneEncoder(Encoder):
         c=tf.concat([state1[0], state2[0]], 1),
         h=tf.concat([state1[1], state2[1]], 1))
     lengths = tf.reduce_sum(tf.stack([sequence_length[0], sequence_length[1]], 0), 0)
-
-    print("Checking outputs and states size")
-    print(outputs)
-    print(state)
 
     return EncoderOutput(
         outputs=outputs,

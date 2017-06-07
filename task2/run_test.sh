@@ -9,10 +9,11 @@ export TRAIN_SOURCES=${DATA_DIR}/Training_Shuffled_Dataset_source.txt
 
 # Split Triplets of the test data
 echo " split triplets in test data"
-python3 ./split_triplets.py --type=copy --output_dir ${PRED_DIR} $TEST_INPUT
+python3 ./split_triplets_for_double_source.py --type=copy --output_dir ${PRED_DIR} --fix_prefix test_data $TEST_INPUT
 
-export TEST_SOURCE #some magic to get the names of the test_sources from $1
-export TEST_TARGET # some magic for the targets.
+export TEST_SOURCE1=${PRED_DIR}/test_data_source_d1.txt
+export TEST_SOURCE2=${PRED_DIR}/test_data_source_d2.txt
+export TEST_TARGET=${PRED_DIR}/test_data_target_d.txt
 
 # Run the model on the test data
 python -m bin.infer \
