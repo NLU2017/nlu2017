@@ -54,10 +54,11 @@ def find_max_length_in_words(sentences):
 
 fname = args.infile.name.split("/")[-1]
 prefix = fname.split(".")
-if args.fix_prefix is not "":
-    prefix = args.fix_prefix
 if len(prefix) > 1:
     prefix = prefix[-2]
+
+if args.fix_prefix is not "":
+    prefix = args.fix_prefix
 source1_filename = args.output_dir + "/" + prefix+ "_source_d1.txt"
 source2_filename = args.output_dir + "/" + prefix+ "_source_d2.txt"
 target_filename = args.output_dir + "/" + prefix+ "_target_d.txt"
