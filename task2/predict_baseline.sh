@@ -23,7 +23,7 @@ python3 ${SEQ2SEQ_PATH}/bin/infer.py \
     - class: DummyTask"\
   --model_dir $MODEL_DIR \
   --model_params "
-    target.max_seq_len: 200
+    target.max_seq_len: 100
     vocab_source: $VOCAB_SOURCE
     vocab_target: $VOCAB_TARGET
     "\
