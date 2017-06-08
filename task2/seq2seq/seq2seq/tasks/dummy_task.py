@@ -30,6 +30,7 @@ from tensorflow import gfile
 
 from seq2seq.tasks.inference_task import InferenceTask, unbatch_dict
 
+
 def _get_prediction_length(predictions_dict):
   """Returns the length of the prediction based on the index
   of the first SEQUENCE_END token.
@@ -39,57 +40,11 @@ def _get_prediction_length(predictions_dict):
               len(predictions_dict["predicted_tokens"]))
 
 
-def _get_unk_mapping(filename):
-  """Reads a file that specifies a mapping from source to target tokens.
-  The file must contain lines of the form <source>\t<target>"
-
-  Args:
-    filename: path to the mapping file
-
-  Returns:
-    A dictionary that maps from source -> target tokens.
-  """
-  with gfile.GFile(filename, "r") as mapping_file:
-    lines = mapping_file.readlines()
-    mapping = dict([_.split("\t")[0:2] for _ in lines])
-    mapping = {k.strip(): v.strip() for k, v in mapping.items()}
-  return mapping
 
 
-def _unk_replace(source_tokens,
-                 predicted_tokens,
-                 attention_scores,
-                 mapping=None):
-  """Replaces UNK tokens with tokens from the source or a
-  provided mapping based on the attention scores.
 
-  Args:
-    source_tokens: A numpy array of strings.
-    predicted_tokens: A numpy array of strings.
-    attention_scores: A numeric numpy array
-      of shape `[prediction_length, source_length]` that contains
-      the attention scores.
-    mapping: If not provided, an UNK token is replaced with the
-      source token that has the highest attention score. If provided
-      the token is insead replaced with `mapping[chosen_source_token]`.
 
-  Returns:
-    A new `predicted_tokens` array.
-  """
-  result = []
-  for token, scores in zip(predicted_tokens, attention_scores):
-    if token == "UNK":
-      max_score_index = np.argmax(scores)
-      chosen_source_token = source_tokens[max_score_index]
-      new_target = chosen_source_token
-      if mapping is not None and chosen_source_token in mapping:
-        new_target = mapping[chosen_source_token]
-      result.append(new_target)
-    else:
-      result.append(token)
-  return np.array(result)
-
-class GetPerplexity(InferenceTask):
+class DummyTask(InferenceTask):
   """Defines inference for tasks where both the input and output sequences
   are plain text.
 
@@ -107,34 +62,58 @@ class GetPerplexity(InferenceTask):
   """
 
   def __init__(self, params):
-    super(GetPerplexity, self).__init__(params)
-    self._unk_mapping = None
+    super(DummyTask, self).__init__(params)
+    self._counter = 0
+
 
   @staticmethod
   def default_params():
     params = {}
-    params.update({})
+    params.update({
+        "delimiter": " "
+    })
     return params
 
   def before_run(self, _run_context):
     fetches = {}
-    fetches["losses"] = self._predictions["losses"]
+    fetches["predicted_tokens"] = self._predictions["predicted_tokens"]
+    fetches["predicted_ids"] = self._predictions["predicted_ids"]
+    fetches["logits"] = self._predictions["logits"]
+    fetches["labels.target_len"] = self._predictions["labels.target_len"]
+    #fetches["losses"] = self._predictions["losses"]
+
     return tf.train.SessionRunArgs(fetches)
+
 
   def after_run(self, _run_context, run_values):
     fetches_batch = run_values.results
+
     for fetches in unbatch_dict(fetches_batch):
       # Convert to unicode
-      fetches["losses"] = np.char.decode(
-          fetches["losses"].astype("S"), "utf-8")
-      losses_ = fetches["losses"]
+      fetches["predicted_tokens"] = np.char.decode(fetches["predicted_tokens"].astype("S"), "utf-8")
+      predicted_tokens = fetches["predicted_tokens"]
+      predicted_ids = fetches["predicted_ids"]
 
-      # If we're using beam search we take the first beam
-      if np.ndim(losses_) > 1:
-        losses_ = losses_[:, 0]
 
-      sent = self.params["delimiter"].join(losses_).split("\n")[0]
+      target_len = fetches["labels.target_len"]
+      logits = fetches["logits"]
+      print("logits shape {}".format(logits.shape))
+      print(logits)
 
-      sent = sent.strip()
+      print()
+      print("target lengths")
+      print(target_len)
+      print()
+      sent = self.params["delimiter"].join(predicted_tokens).split(
+          "SEQUENCE_END")[0]
+
+
+      print("counter {}".format(self._counter))
+      print("size of predicted tokens {}".format(len(predicted_tokens)))
+      print("predicted ids: {}".format(predicted_ids))
+      self._counter += 1
 
       print(sent)
+      print("-----prediction dict----")
+      for d in self._predictions.items():
+        print(d[0] + "  {}".format(d[1]))

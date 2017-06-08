@@ -20,3 +20,4 @@ from seq2seq.tasks.decode_text import DecodeText
 from seq2seq.tasks.dump_attention import DumpAttention
 from seq2seq.tasks.dump_beams import DumpBeams
 from seq2seq.tasks.get_perplexity import GetPerplexity
+from seq2seq.tasks.dummy_task import DummyTask

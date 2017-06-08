@@ -325,9 +325,13 @@ class Seq2SeqModel(ModelBase):
     decoder_output, _, = self.decode(encoder_output, features, labels)
 
     if self.mode == tf.contrib.learn.ModeKeys.INFER:
+      #add losses in INFER mode
+      losses = None
+      if labels is not None:
+         losses, loss = self.compute_loss(decoder_output, features, labels)
       predictions = self._create_predictions(
-          decoder_output=decoder_output, features=features, labels=labels)
-      losses, loss = self.compute_loss(decoder_output, features, labels)
+          decoder_output=decoder_output, features=features, labels=labels, losses=losses)
+
       train_op = None
     else:
       losses, loss = self.compute_loss(decoder_output, features, labels)
