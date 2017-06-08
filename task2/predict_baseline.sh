@@ -34,4 +34,7 @@ python3 ${SEQ2SEQ_PATH}/bin/infer.py \
         - $DEV_SOURCES
       target_files:
         - $DEV_TARGETS"\
-  --batch_size 1
+  --batch_size 1 \
+  > ${PRED_DIR}/utterance_perplexities.txt
+
+python3 make_two_columns.py --input ${PRED_DIR}/utterance_perplexities.txt --output ${PRED_DIR}/perplexities.txt
