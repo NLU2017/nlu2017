@@ -12,7 +12,7 @@ export DEV_SOURCES2=${DATA_DIR}/Validation_Shuffled_Dataset_source2.txt
 export DEV_TARGETS=${DATA_DIR}/Validation_Shuffled_Dataset_target.txt
 
 export DEV_TARGETS_REF=${DATA_DIR}/Validation_Shuffled_Dataset_target.txt
-export TRAIN_STEPS=50000
+export TRAIN_STEPS=150000
 export MODEL_DIR=${BASE_DIR}/runs/improved_attention
 
 mkdir -p $MODEL_DIR

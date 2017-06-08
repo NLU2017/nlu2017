@@ -35,4 +35,4 @@ output = np.empty([floor(len(content_numeric) / 2), 2])
 for i in range(len(content_numeric)):
     output[i // 2, i % 2] = content_numeric[i]
 
-np.savetxt(outp, output)
+np.savetxt(outp, output, fmt='%0.2f')

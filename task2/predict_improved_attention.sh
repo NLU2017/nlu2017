@@ -19,10 +19,8 @@ mkdir -p ${PRED_DIR}
 
 python3 ${SEQ2SEQ_PATH}/bin/infer.py \
   --tasks "
-    - class: GetPerplexity" \
+    - class: DummyTask" \
   --model_dir $MODEL_DIR \
-   --model_params "
-    inference.beam_search.beam_width: 5" \
   --input_pipeline "
     class: DoubleSourceParallelTextInputPipeline
     params:
@@ -33,3 +31,5 @@ python3 ${SEQ2SEQ_PATH}/bin/infer.py \
        target_files:
         - $DEV_TARGETS" \
   >  ${PRED_DIR}/predictions_improved_attention.txt
+
+python3 make_two_columns.py --input ${PRED_DIR}/utterance_perplexities.txt --output ${PRED_DIR}/perplexities.txt
