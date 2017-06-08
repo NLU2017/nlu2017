@@ -31,7 +31,7 @@ outp = args.output
 content = open(inp).readlines()
 content_numeric = [float(x.rstrip()) for x in content if is_number(x.rstrip())]
 assert(len(content_numeric) % 2 == 0)
-output = np.empty([math.floor(len(content_numeric) / 2), 2])
+output = np.empty([floor(len(content_numeric) / 2), 2])
 for i in range(len(content_numeric)):
     output[i // 2, i % 2] = content_numeric[i]
 
