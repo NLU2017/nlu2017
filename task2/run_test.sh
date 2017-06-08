@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Declare variables
-TEST_INPUT= $1
+TEST_INPUT=$1
 export PRED_DIR=pred_dir
 export MODEL_DIR=runs/improved_attention
 export DATA_DIR=data
@@ -13,9 +13,9 @@ echo "creating prediction directory"
 mkdir -p $PRED_DIR
 
 # Split Triplets of the test data
-echo " split triplets in test data"
-#python3 ./split_triplets_for_double_source.py --output_dir ${PRED_DIR} --fix_prefix test_data $TEST_INPUT
-python3 ./split_triplets_for_double_source.py --output_dir pred_dir --fix_prefix test_data data/Validation_Shuffled_Dataset.txt
+echo " split triplets in test data from $TEST_INPUT"
+python3 ./split_triplets_for_double_source.py --output_dir ${PRED_DIR} --fix_prefix test_data $TEST_INPUT
+#python3 ./split_triplets_for_double_source.py --output_dir pred_dir --fix_prefix test_data data/Validation_Shuffled_Dataset.txt
 
 
 export TEST_SOURCE1=${PRED_DIR}/test_data_source_d1.txt
@@ -26,7 +26,7 @@ echo "start evalution "
 # Run the model on the test data
 python -m bin.infer \
   --tasks "
-    - class: DummyTask" \
+    - class: GetPerplexity" \
   --model_dir $MODEL_DIR \
   --model_params "
     target.max_seq_len: 100
@@ -45,3 +45,4 @@ python -m bin.infer \
   > ${PRED_DIR}/utterance_perplexities.txt
 
   python3 make_two_columns.py --input ${PRED_DIR}/utterance_perplexities.txt --output ${PRED_DIR}/perplexities.txt
+  echo "DONE: wrote perplexities to ${PRED_DIR}/perplexities.txt"

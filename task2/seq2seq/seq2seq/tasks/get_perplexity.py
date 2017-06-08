@@ -124,17 +124,7 @@ class GetPerplexity(InferenceTask):
   def after_run(self, _run_context, run_values):
     fetches_batch = run_values.results
     for fetches in unbatch_dict(fetches_batch):
-      # Convert to unicode
-      fetches["losses"] = np.char.decode(
-          fetches["losses"].astype("S"), "utf-8")
-      losses_ = fetches["losses"]
-
-      # If we're using beam search we take the first beam
-      if np.ndim(losses_) > 1:
-        losses_ = losses_[:, 0]
-
-      sent = self.params["delimiter"].join(losses_).split("\n")[0]
-
-      sent = sent.strip()
-
-      print(sent)
+      # calculate perplexity
+      losses = fetches['losses']
+      perplexity = np.exp(sum(losses) / len(losses))
+      print(perplexity)
