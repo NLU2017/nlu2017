@@ -8,8 +8,11 @@ export TRAIN_SOURCES=${DATA_DIR}/Training_Shuffled_Dataset_source.txt
 export TRAIN_TARGETS=${DATA_DIR}/Training_Shuffled_Dataset_target.txt
 export DEV_SOURCES=${DATA_DIR}/Validation_Shuffled_Dataset_source.txt
 export DEV_TARGETS=${DATA_DIR}/Validation_Shuffled_Dataset_target.txt
+#export DEV_SOURCES=${DATA_DIR}/source_head.txt
+#export DEV_TARGETS=${DATA_DIR}/target_head.txt
 
-export DEV_TARGETS_REF=${DATA_DIR}/Validation_Shuffled_Dataset_target.txt
+
+export DEV_TARGETS_REF=${DATA_DIR}/target_head.txt
 
 export MODEL_DIR=${BASE_DIR}/runs/baseline
 
@@ -18,13 +21,16 @@ mkdir -p ${PRED_DIR}
 
 python3 ${SEQ2SEQ_PATH}/bin/infer.py \
   --tasks "
-    - class: DecodeText" \
+    - class: DummyTask"\
   --model_dir $MODEL_DIR \
-   --model_params "
-    inference.beam_search.beam_width: 5" \
+  --model_params "
+    target.max_seq_len: 200
+    "\
   --input_pipeline "
     class: ParallelTextInputPipeline
     params:
       source_files:
-        - $DEV_SOURCES" \
-  >  ${PRED_DIR}/predictions_baseline.txt
+        - $DEV_SOURCES
+      target_files:
+        - $DEV_TARGETS"\
+  --batch_size 1
