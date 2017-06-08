@@ -19,7 +19,7 @@ mkdir -p ${PRED_DIR}
 
 python3 ${SEQ2SEQ_PATH}/bin/infer.py \
   --tasks "
-    - class: DummyTask" \
+    - class: DecodeText" \
   --model_dir $MODEL_DIR \
   --input_pipeline "
     class: DoubleSourceParallelTextInputPipeline
@@ -30,6 +30,4 @@ python3 ${SEQ2SEQ_PATH}/bin/infer.py \
         - $DEV_SOURCES2
        target_files:
         - $DEV_TARGETS" \
-  >  ${PRED_DIR}/predictions_improved_attention.txt
-
-python3 make_two_columns.py --input ${PRED_DIR}/utterance_perplexities.txt --output ${PRED_DIR}/perplexities.txt
+  >  ${PRED_DIR}/decoded_sentences.txt
