@@ -97,26 +97,26 @@ class DummyTask(InferenceTask):
 
       target_len = fetches["labels.target_len"]
       logits = fetches["logits"]
-      print("logits shape {}".format(logits.shape))
+      #print("logits shape {}".format(logits.shape))
       #print(logits)
 
-      print()
-      print("target lengths")
-      print(target_len)
-      print()
+      #print()
+      #print("target lengths")
+      #print(target_len)
+      #print()
       sent = self.params["delimiter"].join(predicted_tokens).split(
           "SEQUENCE_END")[0]
 
 
-      print("counter {}".format(self._counter))
-      print("size of predicted tokens {}".format(len(predicted_tokens)))
-      print("predicted ids: {}".format(predicted_ids))
+      #print("counter {}".format(self._counter))
+      #print("size of predicted tokens {}".format(len(predicted_tokens)))
+      #print("predicted ids: {}".format(predicted_ids))
       self._counter += 1
 
-      print(sent)
+      #print(sent)
       losses = fetches["losses"]
-      print("---------------LOSSES----------------")
-      print(losses)
-      print("-----prediction dict----")
-      for d in self._predictions.items():
-        print(d[0] + "  {}".format(d[1]))
+      #print("---------------LOSSES----------------")
+      print(np.exp(sum(losses) / len(losses)))
+      #print("-----prediction dict----")
+      # for d in self._predictions.items():
+      #   print(d[0] + "  {}".format(d[1]))
