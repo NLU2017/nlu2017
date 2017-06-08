@@ -80,7 +80,7 @@ class DummyTask(InferenceTask):
     fetches["predicted_ids"] = self._predictions["predicted_ids"]
     fetches["logits"] = self._predictions["logits"]
     fetches["labels.target_len"] = self._predictions["labels.target_len"]
-    #fetches["losses"] = self._predictions["losses"]
+    fetches["losses"] = self._predictions["losses"]
 
     return tf.train.SessionRunArgs(fetches)
 
@@ -98,7 +98,7 @@ class DummyTask(InferenceTask):
       target_len = fetches["labels.target_len"]
       logits = fetches["logits"]
       print("logits shape {}".format(logits.shape))
-      print(logits)
+      #print(logits)
 
       print()
       print("target lengths")
@@ -114,6 +114,9 @@ class DummyTask(InferenceTask):
       self._counter += 1
 
       print(sent)
+      losses = fetches["losses"]
+      print("---------------LOSSES----------------")
+      print(losses)
       print("-----prediction dict----")
       for d in self._predictions.items():
         print(d[0] + "  {}".format(d[1]))

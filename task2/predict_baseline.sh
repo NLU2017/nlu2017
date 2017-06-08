@@ -11,7 +11,6 @@ export DEV_TARGETS=${DATA_DIR}/Validation_Shuffled_Dataset_target.txt
 #export DEV_SOURCES=${DATA_DIR}/source_head.txt
 #export DEV_TARGETS=${DATA_DIR}/target_head.txt
 
-
 export DEV_TARGETS_REF=${DATA_DIR}/target_head.txt
 
 export MODEL_DIR=${BASE_DIR}/runs/baseline
@@ -25,6 +24,8 @@ python3 ${SEQ2SEQ_PATH}/bin/infer.py \
   --model_dir $MODEL_DIR \
   --model_params "
     target.max_seq_len: 200
+    vocab_source: $VOCAB_SOURCE
+    vocab_target: $VOCAB_TARGET
     "\
   --input_pipeline "
     class: ParallelTextInputPipeline
